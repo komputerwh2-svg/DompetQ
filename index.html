@@ -1056,43 +1056,71 @@
         window.loginDenganFingerprint = async function() {
             if (typeof getarTombol === 'function') getarTombol();
             
-            // 1. Cek apakah user sudah pernah mendaftarkan sidik jari di perangkat ini sebelumnya
             const emailTersimpan = localStorage.getItem('dompetq_fp_email');
             const tokenTersimpan = localStorage.getItem('dompetq_fp_token');
 
+            // 1. Validasi data lokal
             if (!emailTersimpan || !tokenTersimpan) {
-                tampilAlert("Akses Ditolak! Anda belum pernah mendaftarkan sidik jari di HP ini. Silakan masuk lewat Google terlebih dahulu.", "warning");
+                tampilAlert("Akses Ditolak! Anda belum mengaktifkan sidik jari di perangkat ini.", "warning");
                 return;
             }
 
-            // 2. Cek kompatibilitas hardware biometrik HP/Browser
+            // 2. Cek apakah hardware sidik jari tersedia & didukung browser
             if (!window.PublicKeyCredential) {
-                tampilAlert("Fitur Ditolak! Perangkat Anda tidak mendukung pemindaian sidik jari.", "error");
+                tampilAlert("Fitur Ditolak! Browser atau perangkat Anda tidak mendukung biometrik.", "error");
                 return;
             }
 
             try {
-                // Di sini sistem memicu autentikasi biometrik lokal HP.
-                // Jika sidik jari salah / dibatalkan / gagal diverifikasi oleh sistem operasi HP:
-                // (Simulasi sukses autentikasi platform lokal, jika gagal akan terlempar ke blok catch)
+                // =================================================================
+                // EXTRA CTION: MEMICU SENSOR HARDWARE FINGERPRINT BAWAAN HP
+                // =================================================================
+                // Membuat challenge acak untuk dikirim ke hardware keamanan HP
+                const challenge = new Uint8Array(32);
+                window.crypto.getRandomValues(challenge);
+
+                const options = {
+                    publicKey: {
+                        challenge: challenge,
+                        timeout: 60000, // Batas waktu scan (1 menit)
+                        userVerification: "required", // Memaksa HP memunculkan prompt Sidik Jari/PIN/FaceID
+                        // Menggunakan kredensial lokal yang diizinkan oleh sistem operasi
+                    }
+                };
+
+                console.log("Membuka sensor biometrik perangkat keras...");
                 
-                tampilAlert("Sidik Jari Cocok! Selamat Datang Kembali.", "success");
-                
-                // Bypass login & buka enkripsi dasbor DompetQ
-                userSudahLogin = true;
-                kontrolVisibilitasDashboard(true);
-                tutupLoginModal();
-                
-                // Perbarui icon profil di header
-                const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
-                if (profilBtn) {
-                    profilBtn.innerHTML = `<div class="w-full h-full bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-xs">✔</div>`;
+                // Baris di bawah ini yang akan memicu pop-up sistem Android/iOS untuk scan sidik jari!
+                const credential = await navigator.credentials.get(options);
+
+                // Jika baris di atas berhasil dilewati tanpa error, berarti SIDIK JARI COCOK
+                if (credential) {
+                    tampilAlert("Sidik Jari Cocok! Selamat Datang Kembali.", "success");
+                    
+                    // Bypass login & buka seluruh enkripsi dashboard DompetQ
+                    userSudahLogin = true;
+                    if (typeof kontrolVisibilitasDashboard === 'function') {
+                        kontrolVisibilitasDashboard(true);
+                    }
+                    tutupLoginModal();
+                    
+                    // Perbarui visual tombol profil di header jadi tanda centang aman
+                    const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
+                    if (profilBtn) {
+                        profilBtn.innerHTML = `<div class="w-full h-full bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-xs">✔</div>`;
+                    }
                 }
 
             } catch (biometricError) {
-                // Jika sidik jari tidak dikenal oleh sistem keamanan HP atau user membatalkan pemindaian
-                console.error("Gagal verifikasi biometrik:", biometricError);
-                tampilAlert("Login Ditolak! Pemindaian sidik jari gagal atau tidak dikenali.", "error");
+                // Jika sidik jari salah, user menekan tombol 'Batal', atau sensor error
+                console.error("Gagal/Batal verifikasi biometrik:", biometricError);
+                
+                // Deteksi jika user membatalkan proses scan
+                if (biometricError.name === "NotAllowedError") {
+                    tampilAlert("Login Ditolak: Pemindaian sidik jari dibatalkan oleh pengguna.", "warning");
+                } else {
+                    tampilAlert("Login Gagal: Verifikasi sidik jari tidak dikenali oleh perangkat.", "error");
+                }
             }
         }
 
