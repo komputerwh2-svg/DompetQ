@@ -1029,98 +1029,133 @@
         }
 
         // Fungsi Modifikasi Registrasi Sidik Jari
+        // =================================================================
+        // 1. REVISI FUNGSI: DAFTARKAN SIDIK JARI KE HARDWARE HP
+        // =================================================================
         window.daftarkanFingerprint = async function() {
-            // Validasi apakah ekosistem WebAuthn didukung oleh browser dan OS perangkat
-            if (window.PublicKeyCredential) {
-                if (typeof getarTombol === 'function') getarTombol();
+            if (typeof getarTombol === 'function') getarTombol();
+            
+            if (!window.PublicKeyCredential) {
+                tampilAlert("Perangkat atau browser Anda tidak mendukung sistem biometrik.", "error");
+                return;
+            }
+
+            const userSesi = window.auth.currentUser;
+            if (!userSesi) {
+                tampilAlert("Sesi login tidak ditemukan. Silakan masuk lewat Google dulu.", "warning");
+                return;
+            }
+
+            try {
+                // ID unik dan challenge acak untuk pendaftaran hardware
+                const challenge = new Uint8Array(32);
+                window.crypto.getRandomValues(challenge);
                 
-                const userSesi = window.auth.currentUser;
-                if (userSesi) {
+                const userId = new TextEncoder().encode(userSesi.uid);
+
+                const createOptions = {
+                    publicKey: {
+                        challenge: challenge,
+                        rp: {
+                            name: "DompetQ App",
+                            id: window.location.hostname // Otomatis menyesuaikan domain (localhost / github.io)
+                        },
+                        user: {
+                            id: userId,
+                            name: userSesi.email,
+                            displayName: userSesi.displayName || userSesi.email
+                        },
+                        pubKeyCredParams: [
+                            { type: "public-key", alg: -7 },  // ES256 (Paling umum untuk Android/iOS)
+                            { type: "public-key", alg: -257 } // RS256
+                        ],
+                        timeout: 60000,
+                        authenticatorSelection: {
+                            authenticatorAttachment: "platform", // MUTLAK: Memaksa memakai hardware internal (Sidik Jari / FaceID HP)
+                            userVerification: "required"
+                        }
+                    }
+                };
+
+                console.log("Memicu hardware untuk mendaftarkan sidik jari baru...");
+                
+                // POP-UP SISTEM HP AKAN MUNCUL DI SINI UNTUK MENDAFTARKAN JARI ANDA
+                const credential = await navigator.credentials.create(createOptions);
+
+                if (credential) {
+                    // Simpan status bahwa hardware berhasil mengunci kredensial ini
                     localStorage.setItem('dompetq_fp_terdaftar', 'true');
                     localStorage.setItem('dompetq_fp_email', userSesi.email);
                     localStorage.setItem('dompetq_fp_token', userSesi.uid);
                     
-                    tampilAlert("Aktivasi Sidik Jari Berhasil! Sesi Anda sekarang diamankan.", "success");
+                    // Simpan ID kredensial hardware agar bisa dibaca saat login nanti
+                    const credentialIdBase64 = btoa(String.fromCharCode(...new Uint8Array(credential.rawId)));
+                    localStorage.setItem('dompetq_fp_cred_id', credentialIdBase64);
+
+                    tampilAlert("Sidik jari fisik Anda berhasil terdaftar ke sistem aplikasi!", "success");
                     tutupLoginModal();
-                } else {
-                    tampilAlert("Gagal membaca sesi Google Auth. Silakan login ulang.", "error");
                 }
-            } else {
-                // Otomatis menolak pendaftaran sesuai permintaan Anda jika hardware/OS absen
-                tampilAlert("Fitur Ditolak! Perangkat atau browser Anda tidak mendukung sistem Sidik Jari.", "error");
-                tutupLoginModal();
+            } catch (err) {
+                console.error("Gagal mendaftarkan sidik jari ke hardware:", err);
+                tampilAlert("Gagal aktivasi: Perangkat menolak pendaftaran atau sidik jari tidak pas.", "error");
             }
         }
 
-        // Proses verifikasi sidik jari saat user membuka aplikasi kembali nanti
+        // =================================================================
+        // 2. REVISI FUNGSI: VERIFIKASI SIDIK JARI DARI HARDWARE HP
+        // =================================================================
         window.loginDenganFingerprint = async function() {
             if (typeof getarTombol === 'function') getarTombol();
             
             const emailTersimpan = localStorage.getItem('dompetq_fp_email');
             const tokenTersimpan = localStorage.getItem('dompetq_fp_token');
+            const credIdTersimpan = localStorage.getItem('dompetq_fp_cred_id'); // Mengambil ID hardware yang terdaftar
 
-            // 1. Validasi data lokal
-            if (!emailTersimpan || !tokenTersimpan) {
-                tampilAlert("Akses Ditolak! Anda belum mengaktifkan sidik jari di perangkat ini.", "warning");
-                return;
-            }
-
-            // 2. Cek apakah hardware sidik jari tersedia & didukung browser
-            if (!window.PublicKeyCredential) {
-                tampilAlert("Fitur Ditolak! Browser atau perangkat Anda tidak mendukung biometrik.", "error");
+            if (!emailTersimpan || !tokenTersimpan || !credIdTersimpan) {
+                tampilAlert("Akses Ditolak! Anda belum mendaftarkan sidik jari fisik di HP ini.", "warning");
                 return;
             }
 
             try {
-                // =================================================================
-                // EXTRA CTION: MEMICU SENSOR HARDWARE FINGERPRINT BAWAAN HP
-                // =================================================================
-                // Membuat challenge acak untuk dikirim ke hardware keamanan HP
                 const challenge = new Uint8Array(32);
                 window.crypto.getRandomValues(challenge);
 
-                const options = {
+                // Rekonstruksi ID Kredensial dari localStorage menjadi format binary kembali
+                const rawCredId = new Uint8Array(atob(credIdTersimpan).split("").map(c => c.charCodeAt(0)));
+
+                const getOptions = {
                     publicKey: {
                         challenge: challenge,
-                        timeout: 60000, // Batas waktu scan (1 menit)
-                        userVerification: "required", // Memaksa HP memunculkan prompt Sidik Jari/PIN/FaceID
-                        // Menggunakan kredensial lokal yang diizinkan oleh sistem operasi
+                        timeout: 60000,
+                        rpId: window.location.hostname,
+                        allowCredentials: [{
+                            id: rawCredId,
+                            type: 'public-key'
+                        }],
+                        userVerification: "required" // Memaksa verifikasi sidik jari fisik muncul di layar
                     }
                 };
 
-                console.log("Membuka sensor biometrik perangkat keras...");
+                console.log("Meminta verifikasi dari chip biometrik perangkat...");
                 
-                // Baris di bawah ini yang akan memicu pop-up sistem Android/iOS untuk scan sidik jari!
-                const credential = await navigator.credentials.get(options);
+                // SENSOR SIDIK JARI FISIK BAWAAN REKREASI HP AKAN AKTIF DI SINI
+                const assertion = await navigator.credentials.get(getOptions);
 
-                // Jika baris di atas berhasil dilewati tanpa error, berarti SIDIK JARI COCOK
-                if (credential) {
+                if (assertion) {
                     tampilAlert("Sidik Jari Cocok! Selamat Datang Kembali.", "success");
                     
-                    // Bypass login & buka seluruh enkripsi dashboard DompetQ
                     userSudahLogin = true;
-                    if (typeof kontrolVisibilitasDashboard === 'function') {
-                        kontrolVisibilitasDashboard(true);
-                    }
+                    if (typeof kontrolVisibilitasDashboard === 'function') kontrolVisibilitasDashboard(true);
                     tutupLoginModal();
                     
-                    // Perbarui visual tombol profil di header jadi tanda centang aman
                     const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
                     if (profilBtn) {
                         profilBtn.innerHTML = `<div class="w-full h-full bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-xs">✔</div>`;
                     }
                 }
-
-            } catch (biometricError) {
-                // Jika sidik jari salah, user menekan tombol 'Batal', atau sensor error
-                console.error("Gagal/Batal verifikasi biometrik:", biometricError);
-                
-                // Deteksi jika user membatalkan proses scan
-                if (biometricError.name === "NotAllowedError") {
-                    tampilAlert("Login Ditolak: Pemindaian sidik jari dibatalkan oleh pengguna.", "warning");
-                } else {
-                    tampilAlert("Login Gagal: Verifikasi sidik jari tidak dikenali oleh perangkat.", "error");
-                }
+            } catch (err) {
+                console.error("Error autentikasi hardware fingerprint:", err);
+                tampilAlert("Login Ditolak: Verifikasi sidik jari dibatalkan atau tidak dikenali.", "error");
             }
         }
 
