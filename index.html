@@ -604,10 +604,12 @@
         const app = initializeApp(firebaseConfig);
         window.auth = getAuth(app);
         window.db = getFirestore(app);
+        window.firebaseSignInWithEmail = signInWithEmailAndPassword;
+        window.firebaseCreateWithEmail = createUserWithEmailAndPassword;
 
         // 1. DAFTAR EMAIL YANG DIIZINKAN (Ubah sesuai dengan Gmail Anda)
         const EMAIL_WHITELIST = [
-            //"komputerwh2@gmail.com", // Ganti dengan alamat email asli Anda yang sukses login tadi
+            "komputerwh2@gmail.com", // Ganti dengan alamat email asli Anda yang sukses login tadi
             "iwashia@gmail.com" // Anda bisa menambahkan email cadangan di sini jika perlu
         ];
 
@@ -964,7 +966,9 @@
         // 2. INTEGRASI PENGURUS AUTENTIKASI & BIOMETRIK RIIL
         // ==========================================
 
-        // Fungsi login manual Firebase dengan format Modular V10 yang benar
+        // =================================================================
+        // 1. REVISI FUNGSI LOGIN / DAFTAR MANUAL MULTI-PROVIDER
+        // =================================================================
         window.handleFirebaseLogin = function() {
             const email = document.getElementById('auth-email').value;
             const pass = document.getElementById('auth-password').value;
@@ -974,29 +978,56 @@
                 return;
             }
 
-            // Perbaikan Sintaks: Panggil fungsi secara modular, bukan lewat window.auth
-            signInWithEmailAndPassword(window.auth, email, pass)
+            console.log("Memproses autentikasi...");
+
+            // Taktik: Coba masuk terlebih dahulu
+            window.firebaseSignInWithEmail(window.auth, email, pass)
                 .then((userCredential) => {
-                    const user = userCredential.user;
-                    
-                    // Periksa hak akses whitelist
-                    if (EMAIL_WHITELIST.includes(user.email.toLowerCase())) {
-                        // Alihkan tampilan ke penawaran registrasi Sidik Jari jika sukses
-                        document.getElementById('auth-form-container').classList.add('hidden');
-                        document.getElementById('biometric-setup-panel').classList.remove('hidden');
-                    } else {
-                        tampilAlert("Akses Ditolak! Akun Anda tidak terdaftar di sistem whitelist.", "error");
-                        window.auth.signOut();
-                    }
+                    // JIKA SUKSES MASUK (Akun & Password Valid)
+                    prosesSuksesLoginWhitelisting(userCredential.user);
                 })
                 .catch((error) => {
-                    // Tangani pesan eror Firebase agar lebih ramah dibaca
-                    let pesanEror = "Gagal Masuk: " + error.message;
-                    if (error.code === "auth/invalid-credential" || error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
-                        pesanEror = "Email atau password yang Anda masukkan salah.";
+                    console.warn("Autentikasi awal terhambat, Kode:", error.code);
+                    
+                    // KONDISI A: Akun benar-benar belum ada di database Firebase (Daftar Otomatis)
+                    if (error.code === "auth/user-not-found") {
+                        console.log("Email belum terdaftar. Membuat kredensial baru...");
+                        
+                        window.firebaseCreateWithEmail(window.auth, email, pass)
+                            .then((userCredential) => {
+                                tampilAlert("Akun manual baru berhasil didaftarkan!", "success");
+                                prosesSuksesLoginWhitelisting(userCredential.user);
+                            })
+                            .catch((registerError) => {
+                                if (registerError.code === "auth/weak-password") {
+                                    tampilAlert("Pendaftaran ditolak: Kata sandi minimal harus 6 karakter.", "error");
+                                } else {
+                                    tampilAlert("Sistem gagal mengamankan akun baru Anda.", "error");
+                                }
+                            });
+
+                    // KONDISI B: Eror kredensial saat opsi multi-account aktif (Bisa jadi salah password / akun Google)
+                    } else if (error.code === "auth/invalid-credential" || error.code === "auth/wrong-password") {
+                        
+                        // Beri pesan peringatan tegas karena akunnya kemungkinan besar sudah ada namun sandinya keliru
+                        tampilAlert("Gagal Masuk: Kata sandi salah atau akun tidak cocok dengan metode ini. Jika ini email Google Anda, silakan masuk via tombol Google.", "error");
+                        
+                    } else {
+                        // Penanganan eror umum lainnya (cth: Terlalu banyak percobaan/di-block sementara)
+                        tampilAlert("Akses terhambat: " + error.message, "error");
                     }
-                    tampilAlert(pesanEror, "error");
                 });
+        }
+
+        // Fungsi pembantu pengecekan Whitelist (Tetap seperti milik Anda)
+        function prosesSuksesLoginWhitelisting(user) {
+            if (EMAIL_WHITELIST.includes(user.email.toLowerCase())) {
+                document.getElementById('auth-form-container').classList.add('hidden');
+                document.getElementById('biometric-setup-panel').classList.remove('hidden');
+            } else {
+                tampilAlert("Akses Ditolak! Akun Anda sukses dibuat/masuk, tetapi tidak terdaftar di whitelist pemilik.", "error");
+                window.auth.signOut();
+            }
         }
 
         // Fungsi mendaftarkan sidik jari lokal setelah berhasil login manual
