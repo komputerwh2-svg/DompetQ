@@ -183,92 +183,130 @@
     
                 <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 w-full">
                     
-                    <div class="bg-white border border-gray-200/80 rounded-2xl p-6 shadow-xs relative overflow-hidden flex flex-col justify-between h-full min-h-[200px]">
+                    <div class="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-xs relative overflow-hidden flex flex-col justify-between h-full min-h-[210px]">
                         <div class="absolute top-0 left-0 right-0 h-1.5 bg-blue-600"></div>
                         
-                        <div>
-                            <div class="flex justify-between items-center text-gray-400 text-xs font-bold uppercase tracking-wider mb-2">
-                                <span>Rekap Saldo</span>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
+                                <span id="label-rekap-bulan">Rekap Saldo Bulan...</span>
                                 <i class="fas fa-wallet text-gray-400 text-sm"></i>
                             </div>
-                            <p class="text-xs text-gray-500 font-medium">Saldo Tersedia</p>
-                            <h2 class="text-3xl font-black text-gray-900 mt-1 tracking-tight">Rp 7.500.000</h2>
+                            
+                            <div class="flex justify-between items-end">
+                                <div>
+                                    <p class="text-xs text-gray-500 font-medium">Saldo Tersedia</p>
+                                    <h2 id="txt-saldo-utama" class="text-3xl font-black text-gray-900 mt-0.5 tracking-tight">Rp 7.500.000</h2>
+                                </div>
+                                <div class="text-right pb-1">
+                                    <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Sisa Bulan Lalu</p>
+                                    <p id="txt-saldo-lalu" class="text-xs font-bold text-gray-600 mt-0.5">+Rp 2.000.000</p>
+                                </div>
+                            </div>
                         </div>
                         
-                        <div class="grid grid-cols-2 gap-3 mt-4 pt-4 border-t border-gray-100 text-xs">
-                            <div class="bg-emerald-50/60 p-3 rounded-xl border border-emerald-100/50">
-                                <p class="text-emerald-700/80 font-bold uppercase tracking-wider text-[10px]">Pemasukan</p>
-                                <p class="font-black text-emerald-600 mt-0.5 text-sm">+Rp 10.000.000</p>
+                        <div class="grid grid-cols-2 gap-2.5 mt-3 pt-3 border-t border-gray-100 text-xs">
+                            <div class="bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100/50">
+                                <p class="text-emerald-700/80 font-bold uppercase tracking-wider text-[9px]">Pemasukan</p>
+                                <p id="txt-pemasukan" class="font-black text-emerald-600 mt-0.5 text-sm">+Rp 10.000.000</p>
                             </div>
-                            <div class="bg-rose-50/60 p-3 rounded-xl border border-rose-100/50">
-                                <p class="text-rose-700/80 font-bold uppercase tracking-wider text-[10px]">Pengeluaran</p>
-                                <p class="font-black text-rose-600 mt-0.5 text-sm">-Rp 2.500.000</p>
+                            <div class="bg-rose-50/60 p-2.5 rounded-xl border border-rose-100/50">
+                                <p class="text-rose-700/80 font-bold uppercase tracking-wider text-[9px]">Pengeluaran</p>
+                                <p id="txt-pengeluaran" class="font-black text-rose-600 mt-0.5 text-sm">-Rp 2.500.000</p>
                             </div>
+                        </div>
+
+                        <div id="auth-lock-overlay" class="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center text-center p-4 transition-all duration-300">
+                            <div class="w-10 h-10 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center border border-gray-200 shadow-xs mb-2">
+                                <i class="fas fa-lock text-sm"></i>
+                            </div>
+                            <p class="text-xs font-bold text-gray-800">Data Saldo Terkunci</p>
+                            <p class="text-[10px] text-gray-400 max-w-[200px] mt-0.5">Silakan login dengan akun terdaftar untuk melihat rekap keuangan Anda.</p>
+                            <button onclick="openLoginModal()" class="mt-2.5 px-4 py-1.5 bg-blue-600 hover:bg-blue-700 text-white font-bold text-[11px] rounded-lg shadow-xs transition transform active:scale-95">
+                                Masuk Akun
+                            </button>
                         </div>
                     </div>
 
-                    <div class="lg:col-span-2 bg-white border border-gray-200/80 rounded-2xl p-6 shadow-xs flex flex-col justify-center">
-                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-6">Akses Cepat</h3>
+                    <div class="lg:col-span-2 bg-white border border-gray-200/80 rounded-2xl p-5 shadow-xs flex flex-col justify-center relative overflow-hidden min-h-[140px]">
+                        <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-4">Akses Cepat</h3>
                         
-                        <div class="grid grid-cols-4 gap-4 text-center">
-                            <button onclick="handleSmartAction()" class="flex flex-col items-center justify-center space-y-2 group transition transform active:scale-95">
+                        <div class="grid grid-cols-3 gap-3 text-center">
+                            <button onclick="getarTombol(); proteksiAksesUpload()" class="flex flex-col items-center justify-center space-y-2 group transition transform active:scale-95">
                                 <div class="w-14 h-14 rounded-2xl bg-blue-50 group-hover:bg-blue-100 flex items-center justify-center text-blue-600 transition shadow-xs">
-                                    <i class="fas fa-qrcode text-xl"></i>
+                                    <i class="fas fa-upload text-xl"></i>
                                 </div>
                                 <span class="text-xs font-bold text-gray-700 group-hover:text-blue-600 transition">Upload Slip</span>
                             </button>
                             
-                            <button class="flex flex-col items-center justify-center space-y-2 group transition transform active:scale-95">
+                            <button onclick="getarTombol(); proteksiAksesQuickTab('Tabungan')" class="flex flex-col items-center justify-center space-y-2 group transition transform active:scale-95">
                                 <div class="w-14 h-14 rounded-2xl bg-gray-50 group-hover:bg-gray-100 flex items-center justify-center text-gray-600 group-hover:text-gray-800 transition shadow-xs">
-                                    <i class="fas fa-exchange-alt text-xl"></i>
+                                    <i class="fas fa-wallet text-xl"></i>
                                 </div>
                                 <span class="text-xs font-bold text-gray-700 group-hover:text-gray-900 transition">TF Tabungan</span>
                             </button>
                             
-                            <button class="flex flex-col items-center justify-center space-y-2 group transition transform active:scale-95">
+                            <button onclick="getarTombol(); proteksiAksesQuickTab('Servis')" class="flex flex-col items-center justify-center space-y-2 group transition transform active:scale-95">
                                 <div class="w-14 h-14 rounded-2xl bg-gray-50 group-hover:bg-gray-100 flex items-center justify-center text-gray-600 group-hover:text-gray-800 transition shadow-xs">
-                                    <i class="fas fa-receipt text-xl"></i>
+                                    <i class="fas fa-wrench text-xl"></i>
                                 </div>
                                 <span class="text-xs font-bold text-gray-700 group-hover:text-gray-900 transition">TF Servis</span>
                             </button>
+                        </div>
+
+                        <div id="quick-lock-overlay" class="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center text-center p-4 transition-all duration-300">
+                            <div class="w-9 h-9 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center border border-gray-200 shadow-xs mb-1">
+                                <i class="fas fa-bolt text-xs"></i>
+                            </div>
+                            <p class="text-xs font-bold text-gray-800">Akses Cepat Terkunci</p>
+                            <p class="text-[10px] text-gray-400 max-w-[200px] mt-0.5">Otentikasi akun Anda diperlukan untuk menggunakan pintasan menu.</p>
                         </div>
                     </div>
 
                 </div>
 
-                <div class="bg-white border border-gray-200/80 rounded-2xl p-6 shadow-xs w-full">
-                    <div class="flex justify-between items-center mb-4">
+                <div class="bg-white border border-gray-200/80 rounded-2xl p-5 shadow-xs w-full relative overflow-hidden min-h-[180px]">
+    
+                    <div class="flex justify-between items-center mb-3">
                         <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Riwayat Transaksi</h3>
                         <span class="text-xs text-blue-600 font-bold cursor-pointer hover:underline hover:text-blue-700 transition">Lihat Semua</span>
                     </div>
                     
                     <div class="divide-y divide-gray-100">
-                        <div class="flex items-center justify-between py-4 hover:bg-gray-50/50 px-2 -mx-2 rounded-xl transition">
-                            <div class="flex items-center space-x-4">
-                                <div class="w-10 h-10 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-base shadow-xs">
+                        <div class="flex items-center justify-between py-3.5 hover:bg-gray-50/50 px-2 -mx-2 rounded-xl transition">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm shadow-xs">
                                     <i class="fas fa-arrow-down"></i>
                                 </div>
                                 <div>
-                                    <p class="font-bold text-sm text-gray-900">Gaji Bulanan</p>
-                                    <p class="text-xs text-gray-400">29 Jun 2026 • Mandiri Slip</p>
+                                    <p class="font-bold text-xs text-gray-900">Gaji Bulanan</p>
+                                    <p class="text-[10px] text-gray-400">29 Jun 2026 • Mandiri Slip</p>
                                 </div>
                             </div>
-                            <span class="text-emerald-600 font-black text-base">+Rp 5.500.000</span>
+                            <span class="text-emerald-600 font-black text-xs">+Rp 5.500.000</span>
                         </div>
                         
-                        <div class="flex items-center justify-between py-4 hover:bg-gray-50/50 px-2 -mx-2 rounded-xl transition">
-                            <div class="flex items-center space-x-4">
-                                <div class="w-10 h-10 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center text-base shadow-xs">
+                        <div class="flex items-center justify-between py-3.5 hover:bg-gray-50/50 px-2 -mx-2 rounded-xl transition">
+                            <div class="flex items-center space-x-3">
+                                <div class="w-9 h-9 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center text-sm shadow-xs">
                                     <i class="fas fa-arrow-up"></i>
                                 </div>
                                 <div>
-                                    <p class="font-bold text-sm text-gray-900">Belanja Bulanan</p>
-                                    <p class="text-xs text-gray-400">28 Jun 2026 • Supermarket</p>
+                                    <p class="font-bold text-xs text-gray-900">Belanja Bulanan</p>
+                                    <p class="text-[10px] text-gray-400">28 Jun 2026 • Supermarket</p>
                                 </div>
                             </div>
-                            <span class="text-gray-900 font-black text-base">-Rp 1.200.000</span>
+                            <span class="text-gray-900 font-black text-xs">-Rp 1.200.000</span>
                         </div>
                     </div>
+
+                    <div id="tx-lock-overlay" class="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center text-center p-4 transition-all duration-300">
+                        <div class="w-9 h-9 bg-gray-50 text-gray-400 rounded-full flex items-center justify-center border border-gray-200 shadow-xs mb-1.5">
+                            <i class="fas fa-shield-alt text-xs"></i>
+                        </div>
+                        <p class="text-xs font-bold text-gray-800">Riwayat Transaksi Terkunci</p>
+                        <p class="text-[10px] text-gray-400 max-w-[220px] mt-0.5">Mutasi masuk & keluar hanya ditampilkan kepada pengguna terverifikasi.</p>
+                    </div>
+
                 </div>
 
             </div>
@@ -308,6 +346,41 @@
             </div>
 
         </main>
+
+        <div id="modal-notif" class="fixed z-50 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 divide-y divide-gray-100 hidden opacity-0 transition-all duration-200 transform origin-top-right scale-95">
+            <div class="p-3.5 flex justify-between items-center bg-gray-50/50 rounded-t-2xl">
+                <h4 class="text-xs font-black text-gray-800 tracking-wide uppercase">Notifikasi Sistem</h4>
+                <button onclick="bersihkanNotif()" class="text-[10px] text-blue-600 font-bold hover:underline">Tandai Dibaca</button>
+            </div>
+
+            <div class="max-h-60 overflow-y-auto divide-y divide-gray-50">
+                <div class="p-3 flex items-start space-x-3 hover:bg-gray-50/60 transition">
+                    <div class="w-7 h-7 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center flex-shrink-0 text-xs shadow-xs">
+                        <i class="fas fa-shield-alt"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs font-bold text-gray-800 leading-snug">Sistem Keamanan Aktif</p>
+                        <p class="text-[10px] text-gray-400 mt-0.5 leading-relaxed">Selamat! Otentikasi Google DompetQ Anda berhasil dikonfigurasi.</p>
+                        <p class="text-[9px] text-gray-400 mt-1 font-medium">Baru saja</p>
+                    </div>
+                </div>
+
+                <div class="p-3 flex items-start space-x-3 hover:bg-gray-50/60 transition">
+                    <div class="w-7 h-7 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center flex-shrink-0 text-xs shadow-xs">
+                        <i class="fas fa-cloud"></i>
+                    </div>
+                    <div class="flex-1">
+                        <p class="text-xs font-bold text-gray-800 leading-snug">Sinc Cloud Pending</p>
+                        <p class="text-[10px] text-gray-400 mt-0.5 leading-relaxed">Hubungkan Cloud Firestore untuk mengaktifkan pencatatan permanen.</p>
+                        <p class="text-[9px] text-gray-400 mt-1 font-medium">10 menit yang lalu</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="p-2.5 text-center bg-gray-50/30 rounded-b-2xl">
+                <p class="text-[10px] text-gray-400 font-medium">Menampilkan 2 pesan terbaru</p>
+            </div>
+        </div>
 
 
         <div id="modal-login" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-xs">
@@ -457,24 +530,49 @@
             </div>
         </div>
 
+        <!-- START REVISI PART 5: CUSTOM tampilAlert MODAL -->
+        <div id="modal-tampilAlert" class="fixed inset-0 bg-black/60 z-[60] flex items-center justify-center p-4 hidden backdrop-blur-xs transition-all duration-200 opacity-0">
+            <div class="bg-white rounded-2xl w-full max-w-xs overflow-hidden shadow-2xl transform scale-95 transition-all p-5 text-center space-y-4">
+                
+                <!-- Icon Dinamis (Warna & Bentuk diatur lewat JS) -->
+                <div id="tampilAlert-icon-container" class="w-12 h-12 rounded-full flex items-center justify-center mx-auto border shadow-xs">
+                    <i id="tampilAlert-icon" class="fas text-xl"></i>
+                </div>
+
+                <!-- Konten Teks -->
+                <div class="space-y-1">
+                    <h4 id="tampilAlert-title" class="text-sm font-black text-gray-800">Pemberitahuan</h4>
+                    <p id="tampilAlert-message" class="text-[11px] text-gray-400 leading-relaxed max-w-[220px] mx-auto">Pesan peringatan di sini...</p>
+                </div>
+                
+                <!-- Tombol Aksi -->
+                <button onclick="tutuptampilAlertKustom()" class="w-full py-2 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs shadow-md transition transform active:scale-95">
+                    Mengerti
+                </button>
+            </div>
+        </div>
+        <!-- END CUSTOM tampilAlert MODAL -->
+
         <nav id="main-nav">
             <button onclick="getarTombol(); openTab(event, 'rekap')" class="tab-link active-tab">
                 <i class="far fa-chart-bar text-xl"></i>
                 <span>REKAP</span>
             </button>
-            <button onclick="getarTombol(); openTab(event, 'tabungan')" class="tab-link">
-                <i class="fas fa-piggy-bank text-xl"></i>
+
+            <button id="nav-tabungan" onclick="getarTombol(); proteksiAksesTab(event, 'tabungan')" class="tab-link">
+                <i class="fas fa-wallet text-xl"></i>
                 <span>TABUNGAN</span>
             </button>
             
-            <div id="smart-plus-btn" onclick="getarTombol(); handleSmartAction()" class="center-btn">
+            <div id="nav-smart" onclick="getarTombol(); proteksiAksesSmartAction()" class="center-btn">
                 <i class="fas fa-qrcode"></i>
             </div>
             
-            <button onclick="getarTombol(); openTab(event, 'servis')" class="tab-link">
+            <button id="nav-servis" onclick="getarTombol(); proteksiAksesTab(event, 'servis')" class="tab-link">
                 <i class="fas fa-wrench text-xl"></i>
                 <span>SERVIS</span>
             </button>
+
             <button onclick="getarTombol(); openTab(event, 'pengaturan')" class="tab-link">
                 <i class="fas fa-sliders text-xl"></i>
                 <span>SETELAN</span>
@@ -540,7 +638,7 @@
 
                     } else {
                         // JIKA EMAIL TIDAK TERDAFTAR: Tolak secara tegas dan paksa logout dari Firebase
-                        alert(`Akses Ditolak!\nEmail (${user.email}) tidak terdaftar sebagai pemilik sah DompetQ.`);
+                        tampilAlert(`Akses Ditolak!\nEmail (${user.email}) tidak terdaftar sebagai pemilik sah DompetQ.`);
                         
                         window.auth.signOut().then(() => {
                             tutupLoginModal();
@@ -550,7 +648,7 @@
                 })
                 .catch((error) => {
                     console.error("Gagal Login Google:", error.message);
-                    alert("Gagal terhubung dengan akun Google: " + error.message);
+                    tampilAlert("Gagal terhubung dengan akun Google");
                 });
         };
 
@@ -590,6 +688,228 @@
             if (navigator.vibrate) navigator.vibrate(50);
         }
 
+        // FUNGSI UTAMA PENGGANTI tampilAlert BROWSER (MENGGUNAKAN MODAL ANDA)
+        function tampilAlert(pesan, tipe = "warning") {
+            // Jalankan efek getar HP jika fungsi getar Anda tersedia
+            if (typeof getarTombol === 'function') getarTombol();
+
+            const modal = document.getElementById("modal-tampilAlert");
+            const iconContainer = document.getElementById("tampilAlert-icon-container");
+            const icon = document.getElementById("tampilAlert-icon");
+            const title = document.getElementById("tampilAlert-title");
+            const message = document.getElementById("tampilAlert-message");
+
+            if (!modal) return;
+
+            // DATA DINAMIS BERDASARKAN TIPE tampilAlert
+            if (tipe === "success") {
+                title.innerText = "Sukses";
+                message.innerText = pesan;
+                iconContainer.className = "w-12 h-12 rounded-full flex items-center justify-center mx-auto border shadow-xs bg-emerald-50 border-emerald-200 text-emerald-600";
+                icon.className = "fas fa-check-circle text-xl";
+            } else if (tipe === "error") {
+                title.innerText = "Akses Ditolak / Gagal";
+                message.innerText = pesan;
+                iconContainer.className = "w-12 h-12 rounded-full flex items-center justify-center mx-auto border shadow-xs bg-rose-50 border-rose-200 text-rose-600";
+                icon.className = "fas fa-exclamation-triangle text-xl";
+            } else { // default: warning
+                title.innerText = "Perhatian";
+                message.innerText = pesan;
+                iconContainer.className = "w-12 h-12 rounded-full flex items-center justify-center mx-auto border shadow-xs bg-amber-50 border-amber-200 text-amber-500";
+                icon.className = "fas fa-shield-alt text-xl";
+            }
+
+            // Tampilkan Modal dengan animasi transisi Tailwind
+            modal.classList.remove("hidden");
+            setTimeout(() => {
+                modal.classList.remove("opacity-0");
+                modal.querySelector('.transform').classList.remove("scale-95");
+                modal.querySelector('.transform').classList.add("scale-100");
+            }, 10);
+        }
+
+        // FUNGSI UNTUK MENUTUP MODAL (Dipasang di button 'Mengerti' Anda)
+        function tutuptampilAlertKustom() {
+            const modal = document.getElementById("modal-tampilAlert");
+            if (!modal) return;
+
+            modal.classList.add("opacity-0");
+            modal.querySelector('.transform').classList.remove("scale-100");
+            modal.querySelector('.transform').classList.add("scale-95");
+            
+            setTimeout(() => {
+                modal.classList.add("hidden");
+            }, 200); // Sinkron dengan waktu durasi transisi
+        }
+
+        // Fungsi Membuka Modal Notifikasi Tepat di Bawah Tombol Lonceng
+        window.openNotifModal = function() {
+            if (typeof getarTombol === 'function') getarTombol();
+
+            const btnNotif = document.querySelector('button[onclick="openNotifModal()"]');
+            const modalNotif = document.getElementById("modal-notif");
+
+            if (!btnNotif || !modalNotif) return;
+
+            // Jika modal sedang terbuka, klik lagi akan menutupnya (Toggle)
+            if (!modalNotif.classList.contains("hidden")) {
+                tutupNotifModal();
+                return;
+            }
+
+            // Hitung posisi koordinat tombol lonceng secara presisi di layar
+            const koordinat = btnNotif.getBoundingClientRect();
+            
+            // Atur posisi modal notif agar pas di bawah tombol (rata kanan tombol)
+            modalNotif.style.top = `${koordinat.bottom + window.scrollY + 8}px`; // Beri jarak 8px di bawah tombol
+            modalNotif.style.left = `${koordinat.right - 288}px`; // 288px adalah lebar w-72 modal
+
+            // Tampilkan dengan efek animasi mikro
+            modalNotif.classList.remove("hidden");
+            setTimeout(() => {
+                modalNotif.classList.remove("opacity-0", "scale-95");
+                modalNotif.classList.add("opacity-100", "scale-100");
+            }, 10);
+
+            // Pasang deteksi klik di luar modal untuk otomatis menutup
+            setTimeout(() => {
+                document.addEventListener("click", klikLuarNotif);
+            }, 50);
+        }
+
+        // Fungsi Menutup Modal Notifikasi
+        function tutupNotifModal() {
+            const modalNotif = document.getElementById("modal-notif");
+            if (!modalNotif) return;
+
+            modalNotif.classList.remove("opacity-100", "scale-100");
+            modalNotif.classList.add("opacity-0", "scale-95");
+            
+            setTimeout(() => {
+                modalNotif.classList.add("hidden");
+            }, 200);
+
+            document.removeEventListener("click", klikLuarNotif);
+        }
+
+        // Handler Deteksi Klik Luar Elemen
+        function klikLuarNotif(e) {
+            const modalNotif = document.getElementById("modal-notif");
+            const btnNotif = document.querySelector('button[onclick="openNotifModal()"]');
+            
+            if (modalNotif && !modalNotif.contains(e.target) && !btnNotif.contains(e.target)) {
+                tutupNotifModal();
+            }
+        }
+
+        // Aksi membersihkan tanda merah notifikasi baru
+        window.bersihkanNotif = function() {
+            // Sembunyikan titik merah di tombol lonceng
+            const dotNotif = document.querySelector('button[onclick="openNotifModal()"] span');
+            if (dotNotif) dotNotif.classList.add("hidden");
+            
+            tampilAlert("Semua notifikasi ditandai sebagai dibaca", "success");
+            tutupNotifModal();
+        }
+
+        // Jalankan fungsi inisialisasi setelan dashboard saat window siap dimuat
+        document.addEventListener("DOMContentLoaded", () => {
+            updateLabelBulanDinamis();
+        });
+
+        // Fungsi mengubah nama header kartu menjadi bulan sekarang (Contoh: Juni 2026)
+        function updateLabelBulanDinamis() {
+            const namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            const tanggalSekarang = new Date();
+            const bulanIni = namaBulan[tanggalSekarang.getMonth()];
+            const tahunIni = tanggalSekarang.getFullYear();
+            
+            const labelRekap = document.getElementById("label-rekap-bulan");
+            if (labelRekap) {
+                labelRekap.innerText = `Rekap Saldo ${bulanIni} ${tahunIni}`;
+            }
+        }
+
+        // Variabel status global untuk memantau status login
+        let userSudahLogin = false;
+
+        // 1. Fungsi Interseptor untuk Tab Navigasi Kustom
+        function proteksiAksesTab(event, tabName) {
+            if (userSudahLogin) {
+                // Jika sudah login, jalankan fungsi bawaan Anda untuk pindah halaman
+                if (typeof openTab === 'function') openTab(event, tabName);
+            } else {
+                // Jika belum login, batalkan perpindahan halaman dan paksa login
+                tampilAlert(`Akses Terbatas!\nSilakan login terlebih dahulu untuk membuka menu ${tabName.toUpperCase()}.`);
+                if (typeof openLoginModal === 'function') openLoginModal();
+            }
+        }
+
+        // 2. Fungsi Interseptor untuk Tombol Tengah (OCR Smart Scan)
+        function proteksiAksesSmartAction() {
+            if (userSudahLogin) {
+                if (typeof handleSmartAction === 'function') handleSmartAction();
+            } else {
+                tampilAlert("Akses Terbatas!\nFitur Smart Scan Engine memerlukan otentikasi akun.");
+                if (typeof openLoginModal === 'function') openLoginModal();
+            }
+        }
+
+        // Interseptor khusus untuk tombol Upload Slip di Akses Cepat
+        function proteksiAksesUpload() {
+            if (userSudahLogin) {
+                if (typeof handleSmartAction === 'function') handleSmartAction();
+            } else {
+                // Memanggil fungsi modal alert kustom Anda
+                tampilAlert("Akses Terbatas! Silakan login untuk mengunggah berkas slip nota.", "warning");
+                if (typeof openLoginModal === 'function') openLoginModal();
+            }
+        }
+
+        // Interseptor untuk pintasan transfer tabungan / servis
+        function proteksiAksesQuickTab(namaMenu) {
+            if (userSudahLogin) {
+                // Pemicu aksi menu terkait saat sudah login
+                tampilAlert(`Membuka menu transaksi ${namaMenu}...`, "success");
+            } else {
+                tampilAlert(`Akses Terbatas! Fitur Transfer ${namaMenu} membutuhkan verifikasi akun pemilik.`, "warning");
+                if (typeof openLoginModal === 'function') openLoginModal();
+            }
+        }
+
+        // UPDATE SKRIP KONTROL UTAMA (Sinkronisasi Tiga Sisi)
+        function kontrolVisibilitasDashboard(isLoggedIn) {
+            userSudahLogin = isLoggedIn;
+
+            const lockSaldo = document.getElementById("auth-lock-overlay");
+            const lockTransaksi = document.getElementById("tx-lock-overlay");
+            const lockAksesCepat = document.getElementById("quick-lock-overlay"); // Ambil elemen baru
+            
+            const btnTabungan = document.getElementById("nav-tabungan");
+            const btnServis = document.getElementById("nav-servis");
+            const btnSmart = document.getElementById("nav-smart");
+            
+            if (isLoggedIn) {
+                // Buka seluruh tirai pengunci data di dashboard
+                if (lockSaldo) lockSaldo.classList.add("hidden");
+                if (lockTransaksi) lockTransaksi.classList.add("hidden");
+                if (lockAksesCepat) lockAksesCepat.classList.add("hidden"); // Buka kunci
+                
+                if (btnTabungan) btnTabungan.style.opacity = "1";
+                if (btnServis) btnServis.style.opacity = "1";
+                if (btnSmart) btnSmart.style.opacity = "1";
+            } else {
+                // Tutup kembali seluruh tirai pengunci data
+                if (lockSaldo) lockSaldo.classList.remove("hidden");
+                if (lockTransaksi) lockTransaksi.classList.remove("hidden");
+                if (lockAksesCepat) lockAksesCepat.classList.remove("hidden"); // Kunci kembali
+                
+                if (btnTabungan) btnTabungan.style.opacity = "0.4";
+                if (btnServis) btnServis.style.opacity = "0.4";
+                if (btnSmart) btnSmart.style.opacity = "0.4";
+            }
+        }
+
 
         // Membuka modal login saat tombol profil di header diklik
         function openLoginModal() {
@@ -623,7 +943,7 @@
             const pass = document.getElementById('auth-password').value;
             
             if (!email || !pass) {
-                alert("Silakan isi email dan password terlebih dahulu.");
+                tampilAlert("Silakan isi email dan password terlebih dahulu.");
                 return;
             }
 
@@ -646,18 +966,18 @@
                     if (typeof getarTombol === 'function') getarTombol();
                     
                     // Di sini browser HP akan otomatis memunculkan pop-up sidik jari sistem bawaan android/iOS
-                    alert("Sistem HP: Tempatkan sidik jari Anda pada sensor untuk konfirmasi pendaftaran.");
+                    tampilAlert("Sistem HP: Tempatkan sidik jari Anda pada sensor untuk konfirmasi pendaftaran.");
                     
                     // Simpan status sukses pendaftaran ke database lokal browser
                     localStorage.setItem('fp_terdaftar', 'true');
-                    alert("Aktivasi Sidik Jari Berhasil! Sesi Anda sekarang diamankan.");
+                    tampilAlert("Aktivasi Sidik Jari Berhasil! Sesi Anda sekarang diamankan.");
                     tutupLoginModal();
                 } else {
-                    alert("Sensor sidik jari tidak ditemukan atau tidak dikonfigurasi di HP ini.");
+                    tampilAlert("Sensor sidik jari tidak ditemukan atau tidak dikonfigurasi di HP ini.");
                     tutupLoginModal();
                 }
             } else {
-                alert("Browser atau perangkat Anda belum mendukung fitur Biometrik WebAuthn.");
+                tampilAlert("Browser atau perangkat Anda belum mendukung fitur Biometrik WebAuthn.");
                 tutupLoginModal();
             }
         }
@@ -670,12 +990,12 @@
             console.log("Memanggil sensor biometrik HP...");
             
             // Jika sidik jari yang ditempelkan cocok dengan pemilik HP:
-            alert("Sidik Jari Cocok! Selamat Datang Kembali di DompetQ.");
+            tampilAlert("Sidik Jari Cocok! Selamat Datang Kembali di DompetQ.");
             tutupLoginModal();
         }
 
         function lewatiBiometrik() {
-            alert("Login Sukses tanpa sidik jari.");
+            tampilAlert("Login Sukses tanpa sidik jari.");
             tutupLoginModal();
         }
 
@@ -756,7 +1076,7 @@
                     if (typeof openTambahTabunganModal === 'function') {
                         openTambahTabunganModal();
                     } else {
-                        alert("Membuka Modal Tambah Target Tabungan (Form Pen)...");
+                        tampilAlert("Membuka Modal Tambah Target Tabungan (Form Pen)...");
                     }
                     break;
                     
@@ -764,7 +1084,7 @@
                     if (typeof openEditServisModal === 'function') {
                         openEditServisModal();
                     } else {
-                        alert("Membuka Modal Menu Edit / Tambah Servis...");
+                        tampilAlert("Membuka Modal Menu Edit / Tambah Servis...");
                     }
                     break;
             }
@@ -822,7 +1142,7 @@
                 let teksHasilScanGagal = false; 
 
                 if (teksHasilScanGagal) {
-                    alert(`Proses Ditolak! Gambar tidak mengandung teks indikasi "slip ${jenis}" yang valid.`);
+                    tampilAlert(`Proses Ditolak! Gambar tidak mengandung teks indikasi "slip ${jenis}" yang valid.`);
                     tutupModal();
                     return;
                 }
@@ -879,7 +1199,7 @@
             const jenis = document.getElementById('jenis-slip').value;
             const hasilNetto = document.getElementById('ocr-bersih').value;
             
-            alert(`Berhasil Menyimpan! Data ${jenis.toUpperCase()} dengan total Netto Rp ${parseInt(hasilNetto).toLocaleString('id-ID')} telah masuk rekap.`);
+            tampilAlert(`Berhasil Menyimpan! Data ${jenis.toUpperCase()} dengan total Netto Rp ${parseInt(hasilNetto).toLocaleString('id-ID')} telah masuk rekap.`);
             tutupModal();
         }
 
@@ -893,7 +1213,7 @@
         }
 
         function simpanBerhasilSimulasi() {
-            alert("Sesi Validasi Sukses! Data diamankan sebelum sinkronisasi Firebase.");
+            tampilAlert("Sesi Validasi Sukses! Data diamankan sebelum sinkronisasi Firebase.");
             tutupModal();
         }
     </script>
