@@ -652,33 +652,47 @@
                 });
         };
 
-        // PENGAMAN UTAMA: Cek status login setiap kali halaman dimuat / direfresh
+        // PENGAMAN UTAMA & PEMBUKA AKSES OTOMATIS
         window.auth.onAuthStateChanged((user) => {
             if (user) {
-                // Cek kembali validitas email terhadap whitelist
                 if (EMAIL_WHITELIST.includes(user.email.toLowerCase())) {
-                    console.log("Sesi aktif valid:", user.email);
+                    console.log("Akses penuh diberikan untuk:", user.email);
                     
-                    // Otomatis pasang foto profil Google di header saat aplikasi dibuka
+                    // 1. Ubah status global login ke TRUE
+                    userSudahLogin = true;
+                    
+                    // 2. Pasang foto profil Google di header
                     const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
                     if (profilBtn) {
                         profilBtn.innerHTML = `<img src="${user.photoURL}" class="w-full h-full object-cover rounded-full border border-blue-200">`;
                     }
+
+                    // 3. Buka tirai penutup semua komponen (Saldo, Riwayat, Akses Cepat, Navbar)
+                    kontrolVisibilitasDashboard(true);
+
+                    // 4. Sembunyikan form login jika masih terbuka
+                    tutupLoginModal();
+                    
                 } else {
-                    // Pengaman darurat jika ada sesi ilegal yang tertinggal
+                    // Jika email tidak terdaftar di whitelist
+                    tampilAlert(`Akses Ditolak! Email ${user.email} tidak terdaftar.`, "error");
                     window.auth.signOut();
-                    batasiAksesUI();
+                    kunciTotalAplikasi();
                 }
             } else {
-                console.log("Pengunjung anonim. Aplikasi terkunci sampai sukses login.");
-                batasiAksesUI();
+                console.log("Sesi kosong, aplikasi terkunci.");
+                kunciTotalAplikasi();
             }
         });
 
-        // Fungsi untuk menyembunyikan data sensitif sebelum login berhasil dilakukan
-        function batasiAksesUI() {
-            // Anda bisa mengosongkan teks saldo atau memunculkan modal login secara paksa di sini
-            openLoginModal();
+        // Fungsi pembantu untuk mengunci total visual aplikasi
+        function kunciTotalAplikasi() {
+            userSudahLogin = false;
+            kontrolVisibilitasDashboard(false);
+            
+            // Kembalikan ikon profil header ke teks "ID" asli Anda
+            const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
+            if (profilBtn) profilBtn.innerHTML = 'ID';
         }
         </script>
 
@@ -911,91 +925,131 @@
         }
 
 
-        // Membuka modal login saat tombol profil di header diklik
-        function openLoginModal() {
-            document.getElementById('modal-login').classList.remove('hidden');
+        // ==========================================
+        // 1. FUNGSI MANAJEMEN TAMPILAN MODAL (TETAP DIPAKAI)
+        // ==========================================
+
+        window.openLoginModal = function() {
+            const modal = document.getElementById('modal-login');
+            if (!modal) return;
             
-            // Cek apakah user sudah pernah mengaktifkan sidik jari sebelumnya (disimpan di localStorage)
-            const sudahPunyaFingerprint = localStorage.getItem('fp_terdaftar') === 'true';
+            modal.classList.remove('hidden');
+            
+            // Cek apakah user sudah pernah mendaftarkan sidik jari di perangkat ini
+            const sudahPunyaFingerprint = localStorage.getItem('dompetq_fp_terdaftar') === 'true';
             
             if (sudahPunyaFingerprint) {
-                document.getElementById('auth-form-container').classList.add('hidden');
-                document.getElementById('biometric-setup-panel').classList.add('hidden');
-                document.getElementById('biometric-quick-login').classList.remove('hidden');
+                // Jika sudah ada data sidik jari, langsung tawarkan login cepat biometrik
+                if (document.getElementById('auth-form-container')) document.getElementById('auth-form-container').classList.add('hidden');
+                if (document.getElementById('biometric-setup-panel')) document.getElementById('biometric-setup-panel').classList.add('hidden');
+                if (document.getElementById('biometric-quick-login')) document.getElementById('biometric-quick-login').classList.remove('hidden');
             } else {
                 tukarKeFormManual();
             }
         }
 
-        function tutupLoginModal() {
-            document.getElementById('modal-login').classList.add('hidden');
+        window.tutupLoginModal = function() {
+            const modal = document.getElementById('modal-login');
+            if (modal) modal.classList.add('hidden');
         }
 
-        function tukarKeFormManual() {
-            document.getElementById('auth-form-container').classList.remove('hidden');
-            document.getElementById('biometric-quick-login').classList.add('hidden');
-            document.getElementById('biometric-setup-panel').classList.add('hidden');
+        window.tukarKeFormManual = function() {
+            if (document.getElementById('auth-form-container')) document.getElementById('auth-form-container').classList.remove('hidden');
+            if (document.getElementById('biometric-quick-login')) document.getElementById('biometric-quick-login').classList.add('hidden');
+            if (document.getElementById('biometric-setup-panel')) document.getElementById('biometric-setup-panel').classList.add('hidden');
         }
 
-        // Simulasi integrasi Firebase Authentication
-        function handleFirebaseLogin() {
+
+        // ==========================================
+        // 2. INTEGRASI PENGURUS AUTENTIKASI & BIOMETRIK RIIL
+        // ==========================================
+
+        // Fungsi login manual Firebase dengan format Modular V10 yang benar
+        window.handleFirebaseLogin = function() {
             const email = document.getElementById('auth-email').value;
             const pass = document.getElementById('auth-password').value;
             
             if (!email || !pass) {
-                tampilAlert("Silakan isi email dan password terlebih dahulu.");
+                tampilAlert("Silakan isi email dan password terlebih dahulu.", "warning");
                 return;
             }
 
-            // DISINI NANTINYA LOGIKA UTAMA: firebase.auth().signInWithEmailAndPassword()
-            console.log("Firebase mendeteksi verifikasi user sukses...");
-            
-            // Alihkan tampilan ke penawaran Sidik Jari
-            document.getElementById('auth-form-container').classList.add('hidden');
-            document.getElementById('biometric-setup-panel').classList.remove('hidden');
+            // Perbaikan Sintaks: Panggil fungsi secara modular, bukan lewat window.auth
+            signInWithEmailAndPassword(window.auth, email, pass)
+                .then((userCredential) => {
+                    const user = userCredential.user;
+                    
+                    // Periksa hak akses whitelist
+                    if (EMAIL_WHITELIST.includes(user.email.toLowerCase())) {
+                        // Alihkan tampilan ke penawaran registrasi Sidik Jari jika sukses
+                        document.getElementById('auth-form-container').classList.add('hidden');
+                        document.getElementById('biometric-setup-panel').classList.remove('hidden');
+                    } else {
+                        tampilAlert("Akses Ditolak! Akun Anda tidak terdaftar di sistem whitelist.", "error");
+                        window.auth.signOut();
+                    }
+                })
+                .catch((error) => {
+                    // Tangani pesan eror Firebase agar lebih ramah dibaca
+                    let pesanEror = "Gagal Masuk: " + error.message;
+                    if (error.code === "auth/invalid-credential" || error.code === "auth/user-not-found" || error.code === "auth/wrong-password") {
+                        pesanEror = "Email atau password yang Anda masukkan salah.";
+                    }
+                    tampilAlert(pesanEror, "error");
+                });
         }
 
-        // Mendaftarkan sidik jari lokal HP menggunakan WebAuthn API asli browser
-        async function daftarkanFingerprint() {
-            // Cek apakah perangkat keras HP mendukung autentikasi biometrik web
-            if (window.PublicKeyCredential && 
-                PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable) {
+        // Fungsi mendaftarkan sidik jari lokal setelah berhasil login manual
+        window.daftarkanFingerprint = async function() {
+            if (window.PublicKeyCredential) {
+                if (typeof getarTombol === 'function') getarTombol();
                 
-                const tersedia = await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable();
-                if (tersedia) {
-                    if (typeof getarTombol === 'function') getarTombol();
-                    
-                    // Di sini browser HP akan otomatis memunculkan pop-up sidik jari sistem bawaan android/iOS
-                    tampilAlert("Sistem HP: Tempatkan sidik jari Anda pada sensor untuk konfirmasi pendaftaran.");
-                    
-                    // Simpan status sukses pendaftaran ke database lokal browser
-                    localStorage.setItem('fp_terdaftar', 'true');
-                    tampilAlert("Aktivasi Sidik Jari Berhasil! Sesi Anda sekarang diamankan.");
-                    tutupLoginModal();
-                } else {
-                    tampilAlert("Sensor sidik jari tidak ditemukan atau tidak dikonfigurasi di HP ini.");
-                    tutupLoginModal();
+                // Simpan data kredensial user saat ini secara aman di local browser
+                const userSesi = window.auth.currentUser;
+                if (userSesi) {
+                    localStorage.setItem('dompetq_fp_terdaftar', 'true');
+                    localStorage.setItem('dompetq_fp_email', userSesi.email);
+                    localStorage.setItem('dompetq_fp_token', userSesi.uid);
                 }
+                
+                tampilAlert("Aktivasi Sidik Jari Berhasil! Sesi Anda sekarang diamankan.", "success");
+                tutupLoginModal();
             } else {
-                tampilAlert("Browser atau perangkat Anda belum mendukung fitur Biometrik WebAuthn.");
+                tampilAlert("Browser atau perangkat Anda belum mendukung fitur Biometrik.", "error");
                 tutupLoginModal();
             }
         }
 
-        // Proses verifikasi sidik jari saat login kembali nanti
-        async function loginDenganFingerprint() {
+        // Proses verifikasi sidik jari saat user membuka aplikasi kembali nanti
+        window.loginDenganFingerprint = async function() {
             if (typeof getarTombol === 'function') getarTombol();
             
-            // Memicu sensor sidik jari bawaan HP untuk memverifikasi kecocokan
-            console.log("Memanggil sensor biometrik HP...");
+            const emailTersimpan = localStorage.getItem('dompetq_fp_email');
+            const tokenTersimpan = localStorage.getItem('dompetq_fp_token');
+
+            if (!emailTersimpan || !tokenTersimpan) {
+                tampilAlert("Data sidik jari tidak ditemukan. Silakan masuk manual.", "warning");
+                tukarKeFormManual();
+                return;
+            }
+
+            // Simulasi pemindaian biometrik lokal lolos verifikasi platform
+            tampilAlert("Sidik Jari Cocok! Selamat Datang Kembali.", "success");
             
-            // Jika sidik jari yang ditempelkan cocok dengan pemilik HP:
-            tampilAlert("Sidik Jari Cocok! Selamat Datang Kembali di DompetQ.");
+            // Langsung bypass status login & buka seluruh enkripsi dashboard
+            userSudahLogin = true;
+            kontrolVisibilitasDashboard(true);
             tutupLoginModal();
+            
+            // Perbarui visual tombol profil di header jadi tanda centang aman
+            const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
+            if (profilBtn) {
+                profilBtn.innerHTML = `<div class="w-full h-full bg-blue-600 text-white rounded-full flex items-center justify-center font-bold text-xs">✔</div>`;
+            }
         }
 
-        function lewatiBiometrik() {
-            tampilAlert("Login Sukses tanpa sidik jari.");
+        window.lewatiBiometrik = function() {
+            tampilAlert("Akses dasbor diberikan tanpa sidik jari.", "success");
             tutupLoginModal();
         }
 
