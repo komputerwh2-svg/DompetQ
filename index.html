@@ -434,12 +434,13 @@
                     </div>
 
                     <div id="biometric-quick-login" class="hidden text-center space-y-4 py-4">
-                        <button onclick="loginDenganFingerprint()" class="w-16 h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center mx-auto shadow-lg transition transform active:scale-95">
+                        <button onclick="loginDenganFingerprint()" class="w-16 h-16 bg-blue-600 hover:bg-blue-700 text-white rounded-full flex items-center justify-center mx-auto shadow-lg transition transform active:scale-95 animate-bounce">
                             <i class="fas fa-fingerprint text-3xl"></i>
                         </button>
                         <div class="space-y-1">
-                            <p class="text-xs font-bold text-gray-700">Sentuh Sensor Sidik Jari</p>
-                            <p class="text-[10px] text-gray-400">Verifikasi biometrik perangkat untuk membuka kunci aplikasi.</p>
+                            <p class="text-xs font-bold text-gray-700">Memanggil Sensor Biometrik...</p>
+                            <p class="text-[10px] text-gray-400">Silakan tempelkan sidik jari Anda pada sensor fisik HP Anda.</p>
+                            <p class="text-[9px] text-amber-500 font-semibold bg-amber-50 rounded px-2 py-0.5 inline-block mt-1">Klik logo di atas jika pop-up HP tidak muncul</p>
                         </div>
                         <button onclick="tukarKeFormGoogle()" class="text-[11px] text-blue-600 font-semibold hover:underline block mx-auto pt-2">Masuk dengan Akun Google Lain</button>
                     </div>
@@ -582,11 +583,9 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
         import { 
             getAuth, 
-            signInWithEmailAndPassword, 
-            createUserWithEmailAndPassword,
-            GoogleAuthProvider,
-            signInWithPopup 
-        } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
+            setPersistence, 
+            browserSessionPersistence 
+        } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
         import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -601,14 +600,17 @@
         const app = initializeApp(firebaseConfig);
         window.auth = getAuth(app);
         window.db = getFirestore(app);
-        window.firebaseSignInWithEmail = signInWithEmailAndPassword;
-        window.firebaseCreateWithEmail = createUserWithEmailAndPassword;
+        
+        // Paksa Firebase agar langsung menghapus token sesi begitu tab atau browser ditutup
+        setPersistence(auth, browserSessionPersistence)
+        .then(() => {
+            window.auth = auth;
+            console.log("Sesi Firebase dikonfigurasi otomatis hancur saat aplikasi ditutup.");
+        })
+        .catch((error) => {
+            console.error("Gagal menyetel persistensi sesi:", error);
+        });
 
-        // 1. DAFTAR EMAIL YANG DIIZINKAN (Ubah sesuai dengan Gmail Anda)
-        const EMAIL_WHITELIST = [
-            "komputerwh2@gmail.com", // Ganti dengan alamat email asli Anda yang sukses login tadi
-            "iwashia@gmail.com" // Anda bisa menambahkan email cadangan di sini jika perlu
-        ];
 
         // 2. LOGIKA LOGIN GOOGLE DENGAN SISTEM PENGAMAN FILTER EMAIL
         window.handleGoogleLogin = function() {
@@ -696,6 +698,49 @@
         </script>
 
     <script>
+
+        document.addEventListener("DOMContentLoaded", function() {
+            // 1. Pastikan setiap kali aplikasi dibuka/dimuat ulang, sesi login langsung tertutup
+            userSudahLogin = false;
+            if (typeof kontrolVisibilitasDashboard === 'function') {
+                kontrolVisibilitasDashboard(false); 
+            }
+
+            // 2. Cek apakah pengguna sudah memiliki sidik jari fisik yang terdaftar
+            const fpTerdaftar = localStorage.getItem('dompetq_fp_terdaftar');
+            const credIdTersimpan = localStorage.getItem('dompetq_fp_cred_id');
+
+            if (fpTerdaftar === 'true' && credIdTersimpan) {
+                console.log("Sidik jari terdeteksi. Menyiapkan otentikasi otomatis...");
+                
+                // Buka modal login secara otomatis
+                if (typeof openLoginModal === 'function') {
+                    openLoginModal();
+                    updateLabelBulanDinamis();
+                }
+
+                // Sembunyikan form Google, langsung tampilkan panel biometrik cepat
+                document.getElementById('auth-form-container').classList.add('hidden');
+                document.getElementById('biometric-setup-panel').classList.add('hidden');
+                document.getElementById('biometric-quick-login').classList.remove('hidden');
+
+                // OTOMATIS MEMICU POP-UP SCANNER HARDWARE HP TANPA KLIK TOMBOL LAGI
+                // Diberi sedikit delay 500ms agar transisi modal selesai dan browser siap memicu hardware
+                setTimeout(() => {
+                    window.loginDenganFingerprint();
+                }, 500);
+
+            } else {
+                // Jika belum punya sidik jari, buka modal ke arah form Google Auth utama
+                if (typeof openLoginModal === 'function') {
+                    openLoginModal();
+                }
+                document.getElementById('biometric-quick-login').classList.add('hidden');
+                document.getElementById('biometric-setup-panel').classList.add('hidden');
+                document.getElementById('auth-form-container').classList.remove('hidden');
+            }
+        });
+
         // FUNGSI GETAR
         function getarTombol() {
             if (navigator.vibrate) navigator.vibrate(50);
@@ -825,10 +870,6 @@
             tutupNotifModal();
         }
 
-        // Jalankan fungsi inisialisasi setelan dashboard saat window siap dimuat
-        document.addEventListener("DOMContentLoaded", () => {
-            updateLabelBulanDinamis();
-        });
 
         // Fungsi mengubah nama header kartu menjadi bulan sekarang (Contoh: Juni 2026)
         function updateLabelBulanDinamis() {
@@ -1019,11 +1060,12 @@
 
         // Fungsi pembantu pengecekan Whitelist (Tetap seperti milik Anda)
         function prosesSuksesLoginWhitelisting(user) {
-            if (EMAIL_WHITELIST.includes(user.email.toLowerCase())) {
+            // Jika Firebase meloloskan akun (berarti email Anda terdaftar di cloud), akses langsung diberikan
+            if (user) {
                 document.getElementById('auth-form-container').classList.add('hidden');
                 document.getElementById('biometric-setup-panel').classList.remove('hidden');
             } else {
-                tampilAlert("Akses Ditolak! Akun Anda sukses dibuat/masuk, tetapi tidak terdaftar di whitelist pemilik.", "error");
+                tampilAlert("Akses Ditolak! Sesi otentikasi tidak valid.", "error");
                 window.auth.signOut();
             }
         }
