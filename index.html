@@ -514,30 +514,81 @@
         window.auth = getAuth(app);
         window.db = getFirestore(app);
 
-        // LOGIKA LOGIN GOOGLE
+        // 1. DAFTAR EMAIL YANG DIIZINKAN (Ubah sesuai dengan Gmail Anda)
+        const EMAIL_WHITELIST = [
+            //"komputerwh2@gmail.com", // Ganti dengan alamat email asli Anda yang sukses login tadi
+            "iwashia@gmail.com" // Anda bisa menambahkan email cadangan di sini jika perlu
+        ];
+
+        // 2. LOGIKA LOGIN GOOGLE DENGAN SISTEM PENGAMAN FILTER EMAIL
         window.handleGoogleLogin = function() {
             const provider = new GoogleAuthProvider();
             
             signInWithPopup(window.auth, provider)
                 .then((result) => {
                     const user = result.user;
-                    console.log("Google Login Sukses:", user.displayName);
                     
-                    // Ubah inisial ID di header menjadi foto profil Google user!
-                    const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
-                    if (profilBtn) {
-                        profilBtn.innerHTML = `<img src="${user.photoURL}" class="w-full h-full object-cover rounded-full">`;
-                    }
+                    // Periksa apakah email user yang login ada di dalam daftar whitelist
+                    if (EMAIL_WHITELIST.includes(user.email.toLowerCase())) {
+                        console.log("Akses Diberikan untuk:", user.displayName);
+                        
+                        // Pasang foto profil ke tombol ID Header
+                        const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
+                        if (profilBtn) {
+                            profilBtn.innerHTML = `<img src="${user.photoURL}" class="w-full h-full object-cover rounded-full border border-blue-200">`;
+                        }
 
-                    // Pindahkan ke step aktivasi sidik jari lokal setelah sukses login
-                    document.getElementById('auth-form-container').classList.add('hidden');
-                    document.getElementById('biometric-setup-panel').classList.remove('hidden');
+                        // Sembunyikan form login dan lanjutkan ke panel biometrik
+                        document.getElementById('auth-form-container').classList.add('hidden');
+                        document.getElementById('biometric-setup-panel').classList.remove('hidden');
+                        
+                        // Opsional: Buka proteksi enkripsi data Firestore lokal Anda di sini
+                        // loadDataDariFirestore(user.uid);
+
+                    } else {
+                        // JIKA EMAIL TIDAK TERDAFTAR: Tolak secara tegas dan paksa logout dari Firebase
+                        alert(`Akses Ditolak!\nEmail (${user.email}) tidak terdaftar sebagai pemilik sah DompetQ.`);
+                        
+                        window.auth.signOut().then(() => {
+                            tutupLoginModal();
+                            // Pastikan tampilan kembali terkunci atau diarahkan ke halaman kosong
+                        });
+                    }
                 })
                 .catch((error) => {
                     console.error("Gagal Login Google:", error.message);
                     alert("Gagal terhubung dengan akun Google: " + error.message);
                 });
         };
+
+        // PENGAMAN UTAMA: Cek status login setiap kali halaman dimuat / direfresh
+        window.auth.onAuthStateChanged((user) => {
+            if (user) {
+                // Cek kembali validitas email terhadap whitelist
+                if (EMAIL_WHITELIST.includes(user.email.toLowerCase())) {
+                    console.log("Sesi aktif valid:", user.email);
+                    
+                    // Otomatis pasang foto profil Google di header saat aplikasi dibuka
+                    const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
+                    if (profilBtn) {
+                        profilBtn.innerHTML = `<img src="${user.photoURL}" class="w-full h-full object-cover rounded-full border border-blue-200">`;
+                    }
+                } else {
+                    // Pengaman darurat jika ada sesi ilegal yang tertinggal
+                    window.auth.signOut();
+                    batasiAksesUI();
+                }
+            } else {
+                console.log("Pengunjung anonim. Aplikasi terkunci sampai sukses login.");
+                batasiAksesUI();
+            }
+        });
+
+        // Fungsi untuk menyembunyikan data sensitif sebelum login berhasil dilakukan
+        function batasiAksesUI() {
+            // Anda bisa mengosongkan teks saldo atau memunculkan modal login secara paksa di sini
+            openLoginModal();
+        }
         </script>
 
     <script>
