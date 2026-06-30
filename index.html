@@ -634,6 +634,8 @@
         import { 
             getAuth, 
             signInWithPopup, 
+            signInWithRedirect,
+            getRedirectResult,
             GoogleAuthProvider, 
             setPersistence, 
             browserSessionPersistence 
@@ -659,6 +661,12 @@
         window.db = dbInstance;
         window.GoogleAuthProvider = GoogleAuthProvider;
         window.signInWithPopup = signInWithPopup;
+        window.signInWithRedirect = signInWithRedirect;
+
+        // === SOLUSI CRITICAL: EXPOSE FUNGSI SDK KE GLOBAL WINDOW ===
+        // Ini bertujuan agar file js eksternal Anda bebas memanggil fungsi tanpa error "not defined"
+        window.fbCollection = collection;
+        window.fbGetDocs = getDocs;
         
         // 4. ATUR PERSISTENSI SESI
         setPersistence(authInstance, browserSessionPersistence)
@@ -670,7 +678,7 @@
         });
 
         // =================================================================
-        // REVISI TOTAL: LOGIKA LOGIN GOOGLE (FIX ERROR & CLOUD FILTER)
+        // REVISI TOTAL: LOGIKA LOGIN GOOGLE (MENDUKUNG POPUP & REDIRECT GITHUB PAGES)
         // =================================================================
         window.handleGoogleLogin = function() {
             if (typeof getarTombol === 'function') getarTombol();
@@ -683,34 +691,61 @@
             const provider = new window.GoogleAuthProvider();
             console.log("Membuka gerbang autentikasi Google...");
 
-            window.signInWithPopup(window.auth, provider)
-                .then((result) => {
-                    const user = result.user;
-                    console.log("Firebase Auth berhasil meloloskan kredensial untuk:", user.email);
-                    
-                    // Set foto profil ke header
-                    const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
-                    if (profilBtn && user.photoURL) {
-                        profilBtn.innerHTML = `<img src="${user.photoURL}" class="w-full h-full object-cover rounded-full border border-blue-200">`;
-                    }
+            // Jika di GitHub Pages, gunakan Redirect untuk menghindari error COOP Popup Blocked
+            const isGitHubPages = window.location.hostname.includes("github.io");
 
-                    // Alihkan ke fungsi panel setup biometrik / kelulusan login
-                    if (typeof prosesSuksesLoginWhitelisting === 'function') {
-                        prosesSuksesLoginWhitelisting(user);
-                    } else {
-                        document.getElementById('auth-form-container').classList.add('hidden');
-                        document.getElementById('biometric-setup-panel').classList.remove('hidden');
-                    }
-                })
-                .catch((error) => {
-                    console.error("Gagal Login Google:", error.code, error.message);
-                    if (error.code === "auth/admin-restricted-operation" || error.code === "auth/user-not-found") {
-                        tampilAlert("Akses Ditolak! Email Google Anda tidak terdaftar di sistem DompetQ.", "error");
-                    } else {
-                        tampilAlert("Gagal terhubung dengan layanan Google Auth.", "error");
-                    }
-                });
+            if (isGitHubPages) {
+                console.log("Mendeteksi GitHub Pages: Mengalihkan via Redirect...");
+                window.signInWithRedirect(window.auth, provider);
+            } else {
+                window.signInWithPopup(window.auth, provider)
+                    .then((result) => {
+                        handleSuksesAuth(result.user);
+                    })
+                    .catch((error) => {
+                        handleGagalAuth(error);
+                    });
+            }
         };
+
+        // Menangani hasil login kembali setelah proses Redirect dari Google selesai
+        getRedirectResult(authInstance)
+            .then((result) => {
+                if (result && result.user) {
+                    console.log("Sukses masuk kembali via Redirect Auth.");
+                    handleSuksesAuth(result.user);
+                }
+            })
+            .catch((error) => {
+                console.error("Error penanganan redirect auth:", error);
+            });
+
+        function handleSuksesAuth(user) {
+            console.log("Firebase Auth berhasil meloloskan kredensial untuk:", user.email);
+            
+            const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
+            if (profilBtn && user.photoURL) {
+                profilBtn.innerHTML = `<img src="${user.photoURL}" class="w-full h-full object-cover rounded-full border border-blue-200">`;
+            }
+
+            if (typeof prosesSuksesLoginWhitelisting === 'function') {
+                prosesSuksesLoginWhitelisting(user);
+            } else {
+                const formContainer = document.getElementById('auth-form-container');
+                const setupPanel = document.getElementById('biometric-setup-panel');
+                if (formContainer) formContainer.classList.add('hidden');
+                if (setupPanel) setupPanel.classList.remove('hidden');
+            }
+        }
+
+        function handleGagalAuth(error) {
+            console.error("Gagal Login Google:", error.code, error.message);
+            if (error.code === "auth/admin-restricted-operation" || error.code === "auth/user-not-found") {
+                tampilAlert("Akses Ditolak! Email Google Anda tidak terdaftar di sistem DompetQ.", "error");
+            } else {
+                tampilAlert("Gagal terhubung dengan layanan Google Auth.", "error");
+            }
+        }
 
         // =================================================================
         // AUTOMATIC AUTH MONITOR (SINKRONISASI AKTIF + DEV MODE SPECIFIC USER)
@@ -720,7 +755,6 @@
             
             if (IS_DEV_MODE) {
                 console.warn("⚠️ DOMPETQ: Berjalan di Mode Dev. Menggunakan Akun Komputerwh2.");
-                
                 user = {
                     uid: "BMba4ysCA4Vd5QeOd88ohP4BW3Y2", 
                     email: "komputerwh2@gmail.com",
@@ -729,10 +763,9 @@
                 };
             }
 
-            // Logika UI dan data seperti biasa...
             if (user) {
                 console.log("Akses penuh diberikan untuk:", user.email);
-                userSudahLogin = true;
+                window.userSudahLogin = true;
                 
                 const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
                 if (profilBtn && user.photoURL) {
@@ -747,19 +780,17 @@
                     await muatRekapFinansialDashboard(user.uid);
                 }
 
-                // FIX: Gunakan setTimeout agar eksekusi penutupan modal berjalan setelah dokumen UI siap penuh
                 setTimeout(() => {
                     if (typeof tutupLoginModal === 'function') {
                         tutupLoginModal();
                     }
                     
-                    // Fallback pengaman: Jika fungsi di atas gagal, paksa sembunyikan via ID Element modal Anda
                     const modalLoginUtama = document.getElementById('auth-lock-overlay') || document.getElementById('login-modal');
                     if (modalLoginUtama) {
                         modalLoginUtama.classList.add('hidden');
                     }
-                    console.log("🚀 DEV MODE: Modal login berhasil ditutup paksa.");
-                }, 250); // Jeda 250 milidetik
+                    console.log("🚀 Sesi sinkronisasi: Modal login berhasil ditutup.");
+                }, 250);
 
             } else {
                 console.log("Sesi kosong atau telah logout, aplikasi terkunci.");
@@ -768,7 +799,7 @@
         });
 
         function kunciTotalAplikasi() {
-            userSudahLogin = false;
+            window.userSudahLogin = false;
             if (typeof kontrolVisibilitasDashboard === 'function') {
                 kontrolVisibilitasDashboard(false);
             }
@@ -783,7 +814,6 @@
         window.masukModeDeveloperCepat = async function() {
             console.warn("⚠️ DOMPETQ: Memicu bypass login developer secara manual...");
             
-            // 1. Definisikan Data Akun Developer Tetap
             const userDev = {
                 uid: "BMba4ysCA4Vd5QeOd88ohP4BW3Y2", 
                 email: "komputerwh2@gmail.com",
@@ -791,21 +821,17 @@
                 photoURL: "https://ui-avatars.com/api/?name=Komputer+WH&background=2563EB&color=fff"
             };
 
-            // 2. Set Status Global Aplikasi
             window.userSudahLogin = true;
 
-            // 3. Render Profil di Header jika komponennya ada
             const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
             if (profilBtn && userDev.photoURL) {
                 profilBtn.innerHTML = `<img src="${userDev.photoURL}" class="w-full h-full object-cover rounded-full border border-blue-200">`;
             }
 
-            // 4. Buka Akses Dashboard Utama
             if (typeof kontrolVisibilitasDashboard === 'function') {
                 kontrolVisibilitasDashboard(true);
             }
 
-            // 5. Muat Data Firestore untuk UID Akun Ini
             if (typeof muatRekapFinansialDashboard === 'function') {
                 try {
                     await muatRekapFinansialDashboard(userDev.uid);
@@ -815,16 +841,14 @@
                 }
             }
 
-            // 6. Tutup dan Sembunyikan Paksa Modal Login
             if (typeof tutupLoginModal === 'function') {
                 tutupLoginModal();
             }
             
-            // Amankan dengan menyembunyikan elemen overlay secara langsung
             const modalLoginUtama = document.getElementById('auth-lock-overlay') || document.getElementById('login-modal') || document.querySelector('.fixed.inset-0.z-50'); 
             if (modalLoginUtama) {
                 modalLoginUtama.classList.add('hidden');
-                modalLoginUtama.style.display = 'none'; // Tambahan fallback inline style
+                modalLoginUtama.style.display = 'none';
             }
 
             console.log("🚀 Sesi developer aktif. Selamat bekerja!");
