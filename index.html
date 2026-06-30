@@ -676,31 +676,55 @@
     });
 
     // =================================================================
-    // FUNGSI PENANGANAN INTERNAL (DIDEFINISIKAN AWAL AGAR TIDAK UNDEFINED)
+    // FUNGSI PENANGANAN INTERNAL
     // =================================================================
     function handleSuksesAuth(user) {
-        console.log("Firebase Auth berhasil meloloskan kredensial untuk:", user.email);
+        if (!user) return;
+        console.log("🔥 SINKRONISASI UTAMA: Lolos kredensial untuk:", user.email);
         
+        window.userSudahLogin = true;
+
         const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
         if (profilBtn && user.photoURL) {
             profilBtn.innerHTML = `<img src="${user.photoURL}" class="w-full h-full object-cover rounded-full border border-blue-200">`;
         }
 
+        if (typeof kontrolVisibilitasDashboard === 'function') {
+            kontrolVisibilitasDashboard(true);
+        }
+        
+        if (typeof muatRekapFinansialDashboard === 'function') {
+            muatRekapFinansialDashboard(user.uid);
+        }
+
+        // Buka pengunci internal kartu saldo secara paksa
+        const overlaySaldo = document.getElementById('auth-lock-overlay');
+        if (overlaySaldo) {
+            overlaySaldo.classList.add('hidden');
+            overlaySaldo.style.display = 'none';
+        }
+
+        // Jalankan whitelisting jika tersedia
         if (typeof prosesSuksesLoginWhitelisting === 'function') {
             prosesSuksesLoginWhitelisting(user);
-        } else {
-            const formContainer = document.getElementById('auth-form-container');
-            const setupPanel = document.getElementById('biometric-setup-panel');
-            if (formContainer) formContainer.classList.add('hidden');
-            if (setupPanel) setupPanel.classList.remove('hidden');
         }
+
+        // Tutup modal login utama
+        setTimeout(() => {
+            if (typeof tutupLoginModal === 'function') {
+                tutupLoginModal();
+            }
+            const modalLoginUtama = document.getElementById('login-modal');
+            if (modalLoginUtama) {
+                modalLoginUtama.classList.add('hidden');
+            }
+        }, 300);
     }
 
     function handleGagalAuth(error) {
         console.error("Gagal Kredensial Login Google:", error.code, error.message);
-        // Supaya tidak menghambat jalannya aplikasi akibat blokir pop-up bawaan browser
         if (error.code === "auth/popup-blocked" || error.code === "auth/cancelled-popup-request") {
-            console.warn("Aktivitas pop-up login sempat terhambat sistem keamanan internal browser.");
+            console.warn("Pop-up login terblokir, mencoba beralih ke metode lain secara aman.");
             return;
         }
         if (error.code === "auth/admin-restricted-operation" || error.code === "auth/user-not-found") {
@@ -711,59 +735,63 @@
     }
 
     // =================================================================
-    // LOGIKA LOGIN GOOGLE UTAMA (ADAPTIF DESKTOP & MOBILE)
+    // LOGIKA LOGIN GOOGLE UTAMA (HIBRIDA POP-UP DENGAN FALLBACK REDIRECT)
     // =================================================================
     window.handleGoogleLogin = function() {
         if (typeof getarTombol === 'function') getarTombol();
 
         if (!window.auth) {
-            if (typeof tampilAlert === 'function') tampilAlert("Sistem Firebase belum siap. Muat ulang halaman.", "error");
+            if (typeof tampilAlert === 'function') tampilAlert("Sistem Firebase belum siap.", "error");
             return;
         }
 
         const provider = new window.GoogleAuthProvider();
-        console.log("Membuka gerbang autentikasi Google...");
+        console.log("Memicu autentikasi Google...");
 
-        const isMobileDevice = /Mobi|Android|iPhone|iPad|Windows Phone/i.test(navigator.userAgent);
-        const isGitHubPages = window.location.hostname.includes("github.io");
-
-        if (isMobileDevice || isGitHubPages) {
-            console.log("Menggunakan metode: Redirect Auth...");
-            window.signInWithRedirect(window.auth, provider);
-        } else {
-            console.log("Menggunakan metode: Pop-up Auth...");
-            window.signInWithPopup(window.auth, provider)
-                .then((result) => {
-                    if (result && result.user) handleSuksesAuth(result.user);
-                })
-                .catch((error) => {
+        // Utamakan Pop-Up dahulu karena jauh lebih stabil mempertahankan state login di GitHub Pages
+        window.signInWithPopup(window.auth, provider)
+            .then((result) => {
+                if (result && result.user) {
+                    handleSuksesAuth(result.user);
+                }
+            })
+            .catch((error) => {
+                // Jika browser benar-benar menolak keras pop-up, baru lemparkan ke Redirect
+                if (error.code === "auth/popup-blocked" || error.code === "auth/popup-closed-by-user") {
+                    console.log("Pop-up diblokir browser, mengalihkan secara paksa via Redirect...");
+                    window.sedangProsesRedirect = true;
+                    window.signInWithRedirect(window.auth, provider);
+                } else {
                     handleGagalAuth(error);
-                });
-        }
+                }
+            });
     };
 
-    // FLAG CRITICAL DI HP: Menahan penguncian aplikasi mendadak saat siklus redirect berjalan
+    // Flag monitor redirect awal
     window.sedangProsesRedirect = false;
-    if (window.location.hostname.includes("github.io") || /Mobi|Android|iPhone/i.test(navigator.userAgent)) {
+    if (window.location.hostname.includes("github.io")) {
         window.sedangProsesRedirect = true; 
     }
 
-    // Menangani penjemputan token kredensial setelah proses Redirect Google selesai
+    // Menangkap hasil pendaratan redirect jika ada
     getRedirectResult(authInstance)
         .then((result) => {
-            window.sedangProsesRedirect = false;
             if (result && result.user) {
-                console.log("Sukses mengambil hasil pendaratan token via Redirect.");
+                console.log("Sukses masuk via Redirect Auth.");
                 handleSuksesAuth(result.user);
+            } else {
+                // Jika kosong, matikan flag agar onAuthStateChanged bisa memulihkan status kunci aplikasi
+                console.log("Hasil redirect kosong/null. Memulihkan pengunci aplikasi.");
             }
+            window.sedangProsesRedirect = false;
         })
         .catch((error) => {
             window.sedangProsesRedirect = false;
-            handleGagalAuth(error); // SEKARANG AMAN: Fungsi ini dijamin sudah terdefinisi di atas
+            handleGagalAuth(error);
         });
 
     // =================================================================
-    // AUTOMATIC AUTH MONITOR (SINKRONISASI SESI REALTIME)
+    // AUTOMATIC AUTH MONITOR (SINKRONISASI REALTIME & PENGAMAN UTAMA)
     // =================================================================
     window.auth.onAuthStateChanged(async (user) => {
         const IS_DEV_MODE = window.location.hostname === "localhost" || 
@@ -781,46 +809,13 @@
         }
 
         if (user) {
-            console.log("Sesi aktif terdeteksi untuk:", user.email);
-            window.userSudahLogin = true;
-            
-            const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
-            if (profilBtn && user.photoURL) {
-                profilBtn.innerHTML = `<img src="${user.photoURL}" class="w-full h-full object-cover rounded-full border border-blue-200">`;
-            }
-
-            if (typeof kontrolVisibilitasDashboard === 'function') {
-                kontrolVisibilitasDashboard(true);
-            }
-            
-            if (typeof muatRekapFinansialDashboard === 'function') {
-                await muatRekapFinansialDashboard(user.uid);
-            }
-
-            // Bersihkan overlay pengunci rekap internal secara paksa
-            const overlaySaldo = document.getElementById('auth-lock-overlay');
-            if (overlaySaldo) {
-                overlaySaldo.classList.add('hidden');
-                overlaySaldo.style.display = 'none';
-            }
-
-            setTimeout(() => {
-                if (typeof tutupLoginModal === 'function') {
-                    tutupLoginModal();
-                }
-                const modalLoginUtama = document.getElementById('login-modal');
-                if (modalLoginUtama) {
-                    modalLoginUtama.classList.add('hidden');
-                }
-            }, 250);
-
+            handleSuksesAuth(user);
         } else {
-            // Jika browser HP sedang sibuk mengurus redirect, dilarang mengunci halaman!
             if (window.sedangProsesRedirect) {
                 console.log("Kredensial sedang dijemput redirect, menunda pemanggilan fungsi kunci...");
                 return;
             }
-            console.log("Sesi kosong. Mengunci seluruh akses halaman.");
+            console.log("Tidak ada sesi user aktif. Mengunci halaman.");
             kunciTotalAplikasi();
         }
     });
@@ -840,6 +835,19 @@
             overlaySaldo.style.display = 'flex';
         }
     }
+
+    // =================================================================
+    // BYPASS MODE DEVELOPER MANUAL
+    // =================================================================
+    window.masukModeDeveloperCepat = async function() {
+        const userDev = {
+            uid: "BMba4ysCA4Vd5QeOd88ohP4BW3Y2", 
+            email: "komputerwh2@gmail.com",
+            displayName: "Komputerwh2 Dev",
+            photoURL: "https://ui-avatars.com/api/?name=Komputer+WH&background=2563EB&color=fff"
+        };
+        handleSuksesAuth(userDev);
+    };
 </script>
 
     <script>
