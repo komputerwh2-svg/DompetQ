@@ -1709,7 +1709,7 @@
         }
 
         // =================================================================
-// FUNGSIONALITAS AKHIR: SIMPAN DATA FLAT (FIXED 400 & 401 BYPASS)
+// FUNGSIONALITAS AKHIR: SIMPAN DATA FLAT (FIXED AUTH FOR GITHUB PAGES)
 // =================================================================
 window.simpanDataOcr = async function() {
     const jenisKategori = document.getElementById('jenis-slip').value;
@@ -1723,23 +1723,28 @@ window.simpanDataOcr = async function() {
         return;
     }
 
-    let namaUserSistem = "komputerwh2"; 
-    const IS_DEV_MODE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1" || window.location.protocol === "file:";
-
-    if (!IS_DEV_MODE && window.auth && window.auth.currentUser) {
-        const emailAktif = window.auth.currentUser.email || "";
-        if (emailAktif.includes("@")) {
-            namaUserSistem = emailAktif.split('@')[0];
-        }
+    // 1. VALIDASI WAJIB LOGIN (KARENA LIVE DI GITHUB PAGES)
+    if (!window.auth || !window.auth.currentUser) {
+        tampilAlert("Sesi login tidak ditemukan. Silakan login ulang dengan Google.", "error");
+        return;
     }
 
-    // FORMAT KEY ID UNIK: kategori_periode (Contoh: thr_juni_2026)
-    const formatPeriodeClean = periode.trim().toLowerCase().replace(/\s+/g, '_');
-    const formatKategoriClean = jenisKategori.trim().toLowerCase();
-    const keyTransaksi = `${formatKategoriClean}_${formatPeriodeClean}`;
+    const userAktif = window.auth.currentUser;
+    let namaUserSistem = "user_dompetq";
+    if (userAktif.email && userAktif.email.includes("@")) {
+        namaUserSistem = userAktif.email.split('@')[0];
+    }
 
     try {
-        tampilAlert("Sedang menyinkronkan berkas ke cloud server...", "info");
+        tampilAlert("Mengambil token keamanan Firebase...", "info");
+        
+        // AMBIL TOKEN ASLI USER YANG SEDANG LOGIN
+        const userToken = await userAktif.getIdToken(true);
+
+        // FORMAT KEY ID UNIK: kategori_periode (Contoh: thr_juni_2026)
+        const formatPeriodeClean = periode.trim().toLowerCase().replace(/\s+/g, '_');
+        const formatKategoriClean = jenisKategori.trim().toLowerCase();
+        const keyTransaksi = `${formatKategoriClean}_${formatPeriodeClean}`;
 
         const projectId = window.firebaseConfig?.projectId || "dompetq-app";
         let rtdbHost = window.firebaseConfig?.databaseURL 
@@ -1748,7 +1753,8 @@ window.simpanDataOcr = async function() {
 
         // --- PROSES 1: SIMPAN KE FIREBASE REALTIME DATABASE ---
         if (typeof globalCompressedImageBase64 !== 'undefined' && globalCompressedImageBase64) {
-            let endpointRtdb = `https://${rtdbHost}/${keyTransaksi}.json`;
+            // Melampirkan token via query parameter (?auth=TOKEN) sesuai regulasi REST API RTDB
+            let endpointRtdb = `https://${rtdbHost}/${keyTransaksi}.json?auth=${userToken}`;
             
             try {
                 const responRtdb = await fetch(endpointRtdb, {
@@ -1763,23 +1769,16 @@ window.simpanDataOcr = async function() {
                 });
 
                 if (!responRtdb.ok) {
-                    // Jika RTDB menolak karena 401 Unauthorized, abaikan di mode dev agar tidak menggagalkan proses
-                    if (IS_DEV_MODE && responRtdb.status === 401) {
-                        console.warn("⚠️ RTDB Terkunci (401), gambar dilewati untuk mode dev.");
-                    } else {
-                        throw new Error(`RTDB Gagal: ${responRtdb.statusText}`);
-                    }
-                } else {
-                    console.log(`Gambar sukses disimpan di RTDB pada root /${keyTransaksi}`);
+                    throw new Error(`RTDB Gagal: ${responRtdb.status} - ${responRtdb.statusText}`);
                 }
+                console.log(`Gambar sukses disimpan di RTDB: /${keyTransaksi}`);
             } catch (rtdbErr) {
-                if (!IS_DEV_MODE) throw rtdbErr;
-                console.warn("⚠️ Kendala tulis RTDB diabaikan pada mode lokal.");
+                console.error("Gagal simpan gambar ke RTDB:", rtdbErr);
+                throw rtdbErr;
             }
         }
 
         // --- PROSES 2: SIMPAN KE CLOUD FIRESTORE ---
-        // PERBAIKAN: Menggunakan PATCH untuk melakukan write/upsert dengan Custom ID Dokumen spesifik
         const endpointFirestore = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial/${keyTransaksi}`;
 
         const payloadFirestore = {
@@ -1795,31 +1794,28 @@ window.simpanDataOcr = async function() {
             }
         };
 
-        try {
-            console.log(`Mengirim rekap flat ke Firestore (PATCH) dengan ID Dokumen: ${keyTransaksi}`);
-            const responFirestore = await fetch(endpointFirestore, {
-                method: 'PATCH', // Mengubah POST menjadi PATCH untuk menghindari Error 400 Bad Request
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(payloadFirestore)
-            });
+        // Melampirkan token via Authorization Header (Bearer) agar lolos dari Security Rules
+        const headersFirestore = { 
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${userToken}`
+        };
 
-            if (!responFirestore.ok) {
-                const errTxt = await responFirestore.text();
-                if (IS_DEV_MODE) {
-                    console.warn(`⚠️ Firestore merespon status ${responFirestore.status}. Data disimpan secara lokal di console.`);
-                } else {
-                    throw new Error(`Firestore Error: ${responFirestore.status} - ${errTxt}`);
-                }
-            } else {
-                console.log(`Data rekap sukses disimpan di Firestore root rekap_finansial/${keyTransaksi}`);
-            }
-        } catch (firestoreErr) {
-            if (!IS_DEV_MODE) throw firestoreErr;
-            console.warn("⚠️ Kendala jaringan Firestore diabaikan pada mode pengembang.");
+        console.log(`Mengirim rekap flat ke Firestore (PATCH) dengan Otorisasi User.`);
+        const responFirestore = await fetch(endpointFirestore, {
+            method: 'PATCH',
+            headers: headersFirestore,
+            body: JSON.stringify(payloadFirestore)
+        });
+
+        if (!responFirestore.ok) {
+            const errTxt = await responFirestore.text();
+            throw new Error(`Firestore Error: ${responFirestore.status} - ${errTxt}`);
         }
+        
+        console.log(`Data rekap sukses disimpan di Firestore: rekap_finansial/${keyTransaksi}`);
 
         // --- BERHASIL ---
-        tampilAlert(`Sukses! Rekapitulasi ${jenisKategori.toUpperCase()} berhasil dibukukan.`, "success");
+        tampilAlert(`Sukses! Rekapitulasi ${jenisKategori.toUpperCase()} berhasil dibukukan ke Firebase Cloud.`, "success");
         
         if (typeof window.tutupModal === 'function') {
             window.tutupModal();
@@ -1827,7 +1823,7 @@ window.simpanDataOcr = async function() {
 
     } catch (error) {
         console.error("Firebase API Sync Error:", error);
-        tampilAlert(`Terjadi kendala: ${error.message}`, "error");
+        tampilAlert(`Gagal Sinkronisasi Firebase: ${error.message}`, "error");
     }
 };
 
