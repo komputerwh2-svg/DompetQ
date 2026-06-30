@@ -196,23 +196,29 @@
                             <div class="flex justify-between items-end">
                                 <div>
                                     <p class="text-xs text-gray-500 font-medium">Saldo Tersedia</p>
-                                    <h2 id="txt-saldo-utama" class="text-3xl font-black text-gray-900 mt-0.5 tracking-tight">Rp 7.500.000</h2>
+                                    <h2 id="txt-saldo-utama" class="text-3xl font-black text-gray-900 mt-0.5 tracking-tight">Rp 0</h2>
                                 </div>
                                 <div class="text-right pb-1">
                                     <p class="text-[10px] text-gray-400 font-bold uppercase tracking-wider">Sisa Bulan Lalu</p>
-                                    <p id="txt-saldo-lalu" class="text-xs font-bold text-gray-600 mt-0.5">+Rp 2.000.000</p>
+                                    <p id="txt-saldo-lalu" class="text-xs font-bold text-gray-600 mt-0.5">Rp 0</p>
                                 </div>
                             </div>
                         </div>
                         
                         <div class="grid grid-cols-2 gap-2.5 mt-3 pt-3 border-t border-gray-100 text-xs">
-                            <div class="bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100/50">
-                                <p class="text-emerald-700/80 font-bold uppercase tracking-wider text-[9px]">Pemasukan</p>
-                                <p id="txt-pemasukan" class="font-black text-emerald-600 mt-0.5 text-sm">+Rp 10.000.000</p>
+                            <div class="bg-emerald-50/60 p-2.5 rounded-xl border border-emerald-100/50 relative group">
+                                <div class="flex justify-between items-center">
+                                    <p class="text-emerald-700/80 font-bold uppercase tracking-wider text-[9px]">Pemasukan</p>
+                                    <button onclick="bukaModalDetailPemasukan()" class="text-emerald-600 hover:text-emerald-800 transition p-0.5">
+                                        <i class="fas fa-info-circle text-[11px]"></i>
+                                    </button>
+                                </div>
+                                <p id="txt-pemasukan" class="font-black text-emerald-600 mt-0.5 text-sm">+Rp 0</p>
                             </div>
+                            
                             <div class="bg-rose-50/60 p-2.5 rounded-xl border border-rose-100/50">
                                 <p class="text-rose-700/80 font-bold uppercase tracking-wider text-[9px]">Pengeluaran</p>
-                                <p id="txt-pengeluaran" class="font-black text-rose-600 mt-0.5 text-sm">-Rp 2.500.000</p>
+                                <p id="txt-pengeluaran" class="font-black text-rose-600 mt-0.5 text-sm">-Rp 0</p>
                             </div>
                         </div>
 
@@ -347,6 +353,22 @@
             </div>
 
         </main>
+
+        <div id="modal-detail-pemasukan" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center hidden p-4">
+            <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl flex flex-col max-h-[85vh]">
+                <div class="flex justify-between items-center border-b border-gray-100 pb-3 mb-3">
+                    <h3 class="font-black text-gray-900 text-base flex items-center gap-2">
+                        <i class="fas fa-receipt text-emerald-600"></i> Detail Slip Masuk Bulan Ini
+                    </h3>
+                    <button onclick="tutupModalDetailPemasukan()" class="text-gray-400 hover:text-gray-600 text-sm">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                <div id="list-slip-detail" class="overflow-y-auto space-y-2 flex-1 pr-1 text-xs">
+                    <p class="text-center text-gray-400 py-4">Memuat data slip...</p>
+                </div>
+            </div>
+        </div>
 
         <div id="modal-notif" class="fixed z-50 w-72 bg-white rounded-2xl shadow-xl border border-gray-100 divide-y divide-gray-100 hidden opacity-0 transition-all duration-200 transform origin-top-right scale-95">
             <div class="p-3.5 flex justify-between items-center bg-gray-50/50 rounded-t-2xl">
@@ -897,17 +919,31 @@
             tutupNotifModal();
         }
 
+        // Array global sementara untuk menampung detail slip terfilter
+        let cacheSlipBulanIni = [];
 
-        // Fungsi mengubah nama header kartu menjadi bulan sekarang (Contoh: Juni 2026)
-        function updateLabelBulanDinamis() {
-            const namaBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-            const tanggalSekarang = new Date();
-            const bulanIni = namaBulan[tanggalSekarang.getMonth()];
-            const tahunIni = tanggalSekarang.getFullYear();
+        // Helper Pemformatan Mata Uang Rupiah
+        function formatRupiah(angka, denganTanda = true) {
+            const format = new Intl.NumberFormat('id-ID', {
+                style: 'currency',
+                currency: 'IDR',
+                minimumFractionDigits: 0
+            }).format(Math.abs(angka));
             
-            const labelRekap = document.getElementById("label-rekap-bulan");
-            if (labelRekap) {
-                labelRekap.innerText = `Rekap Saldo ${bulanIni} ${tahunIni}`;
+            if (!denganTanda) return format.replace("Rp", "").trim();
+            return angka < 0 ? `-${format}` : format;
+        }
+
+        // 1. ATUR LABEL BULAN BERJALAN SECARA DINAMIS
+        function inisialisasiLabelWaktu() {
+            const listBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
+            const waktuSekarang = new Date();
+            const namaBulan = listBulan[waktuSekarang.getMonth()];
+            const tahun = waktuSekarang.getFullYear(); // Mendapatkan tahun berjalan saat ini (2026)
+            
+            const elemenLabel = document.getElementById('label-rekap-bulan');
+            if (elemenLabel) {
+                elemenLabel.innerText = `Rekap Saldo ${namaBulan} ${tahun}`;
             }
         }
 
@@ -1675,6 +1711,121 @@
             document.getElementById('step-konfirmasi').classList.add('hidden');
             document.getElementById('input-foto').value = ""; // hapus memori file cache upload
             document.getElementById('jenis-slip').value = "gaji";
+        };
+
+
+        // 2. AMBIL DATA REALTIME DARI FIRESTORE & HITUNG BERDASARKAN RUMUS DASHBOARD
+        async function muatRekapFinansialDashboard(userId) {
+            if (!userId) return;
+
+            try {
+                // Sembunyikan kunci pengaman jika auth sukses
+                document.getElementById('auth-lock-overlay').classList.add('hidden');
+                inisialisasiLabelWaktu();
+
+                const waktuSekarang = new Date();
+                const bulanSekarang = waktuSekarang.getMonth(); // 0-11
+                const tahunSekarang = waktuSekarang.getFullYear(); // 2026
+
+                // A. SIMULASI / AMBIL SALDO ROLLOVER BULAN LALU
+                // Idealnya mengambil nilai penutupan sisa saldo dari dokumen users/{userId}/rekap_bulanan/{bulanLalu}
+                // Sebagai fallback aman awal aplikasi, kita tetapkan base saldo default Rp2.000.000
+                let saldoBulanLalu = 2000000; 
+
+                let totalPemasukan = 0;
+                let totalPengeluaran = 0;
+                cacheSlipBulanIni = [];
+
+                // B. TARIK DATA DARI SUB-KOLEKSI REKAP_FINANCIAL
+                const q = query(collection(db, `users/${userId}/rekap_financal`));
+                const querySnapshot = await getDocs(q);
+
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    // Ambil timestamp transaksi
+                    let tglTransaksi = new Date();
+                    if (data.waktuTransaksi) {
+                        // Handle jika formatnya berupa Firestore Timestamp atau string ISO
+                        tglTransaksi = data.waktuTransaksi.seconds ? new Date(data.waktuTransaksi.seconds * 1000) : new Date(data.waktuTransaksi);
+                    }
+
+                    // Filter data khusus untuk bulan berjalan saat ini saja
+                    if (tglTransaksi.getMonth() === bulanSekarang && tglTransaksi.getFullYear() === tahunSekarang) {
+                        
+                        // Jika tipenya adalah slip masuk (kategori: gaji, thr, ksp)
+                        if (data.kategori === 'gaji' || data.kategori === 'thr' || data.kategori === 'ksp') {
+                            const nominalNetto = parseInt(data.totalBersihNetto || data.pendapatan || 0);
+                            totalPemasukan += nominalNetto;
+                            
+                            // Simpan ke cache untuk keperluan modal detail view
+                            cacheSlipBulanIni.push({
+                                id: doc.id,
+                                kategori: data.kategori.toUpperCase(),
+                                nominal: nominalNetto,
+                                tanggal: tglTransaksi.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
+                            });
+                        } 
+                        // Jika tipenya pengeluaran transaksi keluar
+                        else if (data.kategori === 'pengeluaran' || data.kategori === 'belanja' || data.kategori === 'transfer') {
+                            totalPengeluaran += parseInt(data.nominalKeluar || data.pengeluaran || 0);
+                        }
+                    }
+                });
+
+                // C. HITUNG FORMULA SALDO UTAMA TERSEDIA
+                const saldoTersediaUtama = (saldoBulanLalu + totalPemasukan) - totalPengeluaran;
+
+                // D. SUNTIKKAN NILAI TERHITUNG KE ELEMENT UI DASHBOARD
+                document.getElementById('txt-saldo-lalu').innerText = formatRupiah(saldoBulanLalu);
+                document.getElementById('txt-pemasukan').innerText = `+${formatRupiah(totalPemasukan)}`;
+                document.getElementById('txt-pengeluaran').innerText = `-${formatRupiah(totalPengeluaran)}`;
+                document.getElementById('txt-saldo-utama').innerText = formatRupiah(saldoTersediaUtama);
+
+                // Render data ke tabel riwayat mutasi di dashboard bawah jika ada
+                if (typeof renderRiwayatTransaksiUI === "function") {
+                    renderRiwayatTransaksiUI(userId);
+                }
+
+            } catch (er) {
+                console.error("Gagal melakukan kalkulasi dashboard matematika rekap:", er);
+            }
+        }
+
+        // 3. FUNGSI LOGIKA MODAL POPUP DETAIL PEMASUKAN
+        window.bukaModalDetailPemasukan = function() {
+            document.getElementById('modal-detail-pemasukan').classList.remove('hidden');
+            const containerList = document.getElementById('list-slip-detail');
+            containerList.innerHTML = "";
+
+            if (cacheSlipBulanIni.length === 0) {
+                containerList.innerHTML = `<p class="text-center text-gray-400 py-6">Belum ada data slip yang diunggah bulan ini.</p>`;
+                return;
+            }
+
+            cacheSlipBulanIni.forEach(slip => {
+                let iconWarna = slip.kategori === 'GAJI' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600';
+                if(slip.kategori === 'KSP') iconWarna = 'bg-purple-50 text-purple-600';
+
+                const itemHtml = `
+                    <div class="flex justify-between items-center p-3 bg-gray-50 border border-gray-100 rounded-xl">
+                        <div class="flex items-center gap-2.5">
+                            <div class="w-8 h-8 rounded-lg ${iconWarna} flex items-center justify-center font-bold text-[10px]">
+                                ${slip.kategori}
+                            </div>
+                            <div>
+                                <p class="font-bold text-gray-800">E-Slip Document Verified</p>
+                                <p class="text-[10px] text-gray-400">Diproses pada ${slip.tanggal}</p>
+                            </div>
+                        </div>
+                        <p class="font-black text-emerald-600">${formatRupiah(slip.nominal)}</p>
+                    </div>
+                `;
+                containerList.insertAdjacentHTML('beforeend', itemHtml);
+            });
+        };
+
+        window.tutupModalDetailPemasukan = function() {
+            document.getElementById('modal-detail-pemasukan').classList.add('hidden');
         };
     </script>
 </body>
