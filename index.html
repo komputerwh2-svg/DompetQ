@@ -410,7 +410,10 @@
             <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl transition-all flex flex-col max-h-[85vh]">
                 
                 <div class="p-4 border-b border-gray-100 flex justify-between items-center bg-gray-50 flex-shrink-0">
-                    <span class="font-bold text-sm text-gray-800"><i class="fas fa-shield-alt mr-1.5 text-blue-600"></i> Keamanan DompetQ</span>
+                    <span class="font-bold text-sm text-gray-800">
+                        <i onclick="window.masukModeDeveloperCepat()" class="fas fa-shield-alt mr-1.5 text-blue-600 cursor-pointer select-none active:scale-95 transition-transform" title="Dev Mode Bypass"></i> 
+                        Keamanan DompetQ
+                    </span>
                     <button onclick="tutupLoginModal()" class="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
                 </div>
 
@@ -635,7 +638,7 @@
             setPersistence, 
             browserSessionPersistence 
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-        import { getFirestore } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+        import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
         // 2. KONFIGURASI FIREBASE APP
         const firebaseConfig = {
@@ -710,14 +713,25 @@
         };
 
         // =================================================================
-        // AUTOMATIC AUTH MONITOR (SINKRONISASI AKTIF)
+        // AUTOMATIC AUTH MONITOR (SINKRONISASI AKTIF + DEV MODE SPECIFIC USER)
         // =================================================================
-        window.auth.onAuthStateChanged((user) => {
-            if (user) {
-                // Karena validasi Whitelist sudah di cloud (Jalur 1 / Jalur 2),
-                // Jika user berhasil masuk ke sini, artinya dia adalah user yang sah.
-                console.log("Akses penuh diberikan untuk:", user.email);
+        window.auth.onAuthStateChanged(async (user) => {
+            const IS_DEV_MODE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+            
+            if (IS_DEV_MODE) {
+                console.warn("⚠️ DOMPETQ: Berjalan di Mode Dev. Menggunakan Akun Komputerwh2.");
                 
+                user = {
+                    uid: "BMba4ysCA4Vd5QeOd88ohP4BW3Y2", 
+                    email: "komputerwh2@gmail.com",
+                    displayName: "Komputerwh2 Dev",
+                    photoURL: "https://ui-avatars.com/api/?name=Komputer+WH&background=2563EB&color=fff"
+                };
+            }
+
+            // Logika UI dan data seperti biasa...
+            if (user) {
+                console.log("Akses penuh diberikan untuk:", user.email);
                 userSudahLogin = true;
                 
                 const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
@@ -728,7 +742,25 @@
                 if (typeof kontrolVisibilitasDashboard === 'function') {
                     kontrolVisibilitasDashboard(true);
                 }
-                tutupLoginModal();
+                
+                if (typeof muatRekapFinansialDashboard === 'function') {
+                    await muatRekapFinansialDashboard(user.uid);
+                }
+
+                // FIX: Gunakan setTimeout agar eksekusi penutupan modal berjalan setelah dokumen UI siap penuh
+                setTimeout(() => {
+                    if (typeof tutupLoginModal === 'function') {
+                        tutupLoginModal();
+                    }
+                    
+                    // Fallback pengaman: Jika fungsi di atas gagal, paksa sembunyikan via ID Element modal Anda
+                    const modalLoginUtama = document.getElementById('auth-lock-overlay') || document.getElementById('login-modal');
+                    if (modalLoginUtama) {
+                        modalLoginUtama.classList.add('hidden');
+                    }
+                    console.log("🚀 DEV MODE: Modal login berhasil ditutup paksa.");
+                }, 250); // Jeda 250 milidetik
+
             } else {
                 console.log("Sesi kosong atau telah logout, aplikasi terkunci.");
                 kunciTotalAplikasi();
@@ -744,6 +776,59 @@
             const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
             if (profilBtn) profilBtn.innerHTML = 'ID';
         }
+
+        // =================================================================
+        // PROSES BYPASS LOGIN DEVELOPER MANUAL (CARA KEDUA)
+        // =================================================================
+        window.masukModeDeveloperCepat = async function() {
+            console.warn("⚠️ DOMPETQ: Memicu bypass login developer secara manual...");
+            
+            // 1. Definisikan Data Akun Developer Tetap
+            const userDev = {
+                uid: "BMba4ysCA4Vd5QeOd88ohP4BW3Y2", 
+                email: "komputerwh2@gmail.com",
+                displayName: "Komputerwh2 Dev",
+                photoURL: "https://ui-avatars.com/api/?name=Komputer+WH&background=2563EB&color=fff"
+            };
+
+            // 2. Set Status Global Aplikasi
+            window.userSudahLogin = true;
+
+            // 3. Render Profil di Header jika komponennya ada
+            const profilBtn = document.querySelector('button[onclick="openLoginModal()"]');
+            if (profilBtn && userDev.photoURL) {
+                profilBtn.innerHTML = `<img src="${userDev.photoURL}" class="w-full h-full object-cover rounded-full border border-blue-200">`;
+            }
+
+            // 4. Buka Akses Dashboard Utama
+            if (typeof kontrolVisibilitasDashboard === 'function') {
+                kontrolVisibilitasDashboard(true);
+            }
+
+            // 5. Muat Data Firestore untuk UID Akun Ini
+            if (typeof muatRekapFinansialDashboard === 'function') {
+                try {
+                    await muatRekapFinansialDashboard(userDev.uid);
+                    console.log("✅ Data finansial developer berhasil dimuat.");
+                } catch (err) {
+                    console.error("Gagal memuat rekap finansial:", err);
+                }
+            }
+
+            // 6. Tutup dan Sembunyikan Paksa Modal Login
+            if (typeof tutupLoginModal === 'function') {
+                tutupLoginModal();
+            }
+            
+            // Amankan dengan menyembunyikan elemen overlay secara langsung
+            const modalLoginUtama = document.getElementById('auth-lock-overlay') || document.getElementById('login-modal') || document.querySelector('.fixed.inset-0.z-50'); 
+            if (modalLoginUtama) {
+                modalLoginUtama.classList.add('hidden');
+                modalLoginUtama.style.display = 'none'; // Tambahan fallback inline style
+            }
+
+            console.log("🚀 Sesi developer aktif. Selamat bekerja!");
+        };
     </script>
 
     <script>
@@ -1600,7 +1685,7 @@
         }
 
         // =================================================================
-        // FUNGSIONALITAS AKHIR: SIMPAN DATA SPLIT (FIRESTORE + RTDB) - FIXED
+        // FUNGSIONALITAS AKHIR: SIMPAN DATA SPLIT (FIRESTORE + RTDB) - DEV MODE IMPLEMENTED
         // =================================================================
         window.simpanDataOcr = async function() {
             const jenisKategori = document.getElementById('jenis-slip').value;
@@ -1614,29 +1699,46 @@
                 return;
             }
 
-            if (!window.auth || !window.auth.currentUser) {
-                tampilAlert("Sesi akun Anda telah berakhir. Silakan masuk ulang.", "error");
-                return;
+            // 1. KONDISIONAL MODE DEVELOPMENT VS PRODUCTION
+            const IS_DEV_MODE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+            let uid = "";
+            let userToken = null;
+
+            if (IS_DEV_MODE) {
+                console.warn("⚠️ DOMPETQ: Menyimpan data lokal menggunakan identitas komputerwh2@gmail.com");
+                // PENTING: Ganti string di bawah ini dengan UID asli yang didapat dari Firebase Console Auth Anda
+                uid = "BMba4ysCA4Vd5QeOd88ohP4BW3Y2"; 
+            } else {
+                // Validasi production normal
+                if (!window.auth || !window.auth.currentUser) {
+                    tampilAlert("Sesi akun Anda telah berakhir. Silakan masuk ulang.", "error");
+                    return;
+                }
+                uid = window.auth.currentUser.uid;
             }
 
-            const uid = window.auth.currentUser.uid;
             const keyTransaksi = `ocr_${Date.now()}`;
 
             try {
                 tampilAlert("Sedang menyinkronkan berkas ke cloud server...", "info");
 
-                // --- AMBIL TOKEN OTENTIKASI USER AKTIF (WAJIB UNTUK TEMBUS SECURITY RULES) ---
-                const userToken = await window.auth.currentUser.getIdToken(true);
+                // --- AMBIL TOKEN OTENTIKASI HANYA JIKA BUKAN MODE DEVELOPER ---
+                if (!IS_DEV_MODE && window.auth.currentUser) {
+                    userToken = await window.auth.currentUser.getIdToken(true);
+                }
 
-                // 1. Ekstrak Host RTDB secara aman tanpa protocol https:// dan tanpa trailing slash
+                // Ekstrak Host RTDB secara aman
                 let rtdbHost = window.firebaseConfig?.databaseURL 
                     ? window.firebaseConfig.databaseURL.replace(/^https?:\/\//, '').replace(/\/$/, '')
-                    : "dompetq-app-default-rtdb.asia-southeast1.firebasedatabase.app"; // Fallback host murni
+                    : "dompetq-app-default-rtdb.asia-southeast1.firebasedatabase.app";
 
                 // --- PROSES 1: SIMPAN GAMBAR BASE64 KE FIREBASE REALTIME DATABASE ---
                 if (globalCompressedImageBase64) {
-                    // Ditambahkan ?auth=${userToken} agar diverifikasi oleh Realtime Database Rules
-                    const endpointRtdb = `https://${rtdbHost}/users/${uid}/dokumen_ocr/${keyTransaksi}.json?auth=${userToken}`;
+                    // Jika mode dev, abaikan parameter ?auth= karena bypass REST API lokal tidak mengirim token
+                    let endpointRtdb = `https://${rtdbHost}/users/${uid}/dokumen_ocr/${keyTransaksi}.json`;
+                    if (!IS_DEV_MODE && userToken) {
+                        endpointRtdb += `?auth=${userToken}`;
+                    }
                     
                     const responRtdb = await fetch(endpointRtdb, {
                         method: 'PUT',
@@ -1656,8 +1758,8 @@
 
                 // --- PROSES 2: SIMPAN REKAP TRANSAKSI FINANSIAL KE CLOUD FIRESTORE ---
                 const projectId = window.firebaseConfig?.projectId || "dompetq-app";
-                // Menggunakan POST ke base path collection sesuai standar REST API Firestore v1
-                const endpointFirestore = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}/rekap_finansial?documentId=${keyTransaksi}`;
+                // Diselaraskan dengan sub-collection 'rekap_financal' sesuai log snapshot database Anda
+                const endpointFirestore = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}/rekap_financal?documentId=${keyTransaksi}`;
 
                 const payloadFirestore = {
                     fields: {
@@ -1671,12 +1773,15 @@
                     }
                 };
 
+                // Header kondisional: Jangan kirim authorization token bearer jika undefined di localhost
+                const headersFirestore = { 'Content-Type': 'application/json' };
+                if (!IS_DEV_MODE && userToken) {
+                    headersFirestore['Authorization'] = `Bearer ${userToken}`;
+                }
+
                 const responFirestore = await fetch(endpointFirestore, {
                     method: 'POST',
-                    headers: { 
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${userToken}` // Mengirim token di header agar tembus Firestore Rules
-                    },
+                    headers: headersFirestore,
                     body: JSON.stringify(payloadFirestore)
                 });
 
@@ -1686,6 +1791,11 @@
 
                 tampilAlert(`Sukses! Rekapitulasi ${jenisKategori.toUpperCase()} berhasil dibukukan ke sistem database.`, "success");
                 window.tutupModal();
+
+                // 3. RE-CALCULATE DASHBOARD OTOMATIS JIKA FUNGSI REKAP SUDAH SIAP
+                if (typeof muatRekapFinansialDashboard === 'function') {
+                    await muatRekapFinansialDashboard(uid);
+                }
 
             } catch (error) {
                 console.error("Firebase API Sync Error:", error);
@@ -1714,118 +1824,184 @@
         };
 
 
+        // =================================================================
         // 2. AMBIL DATA REALTIME DARI FIRESTORE & HITUNG BERDASARKAN RUMUS DASHBOARD
-        async function muatRekapFinansialDashboard(userId) {
-            if (!userId) return;
-
-            try {
-                // Sembunyikan kunci pengaman jika auth sukses
-                document.getElementById('auth-lock-overlay').classList.add('hidden');
-                inisialisasiLabelWaktu();
-
-                const waktuSekarang = new Date();
-                const bulanSekarang = waktuSekarang.getMonth(); // 0-11
-                const tahunSekarang = waktuSekarang.getFullYear(); // 2026
-
-                // A. SIMULASI / AMBIL SALDO ROLLOVER BULAN LALU
-                // Idealnya mengambil nilai penutupan sisa saldo dari dokumen users/{userId}/rekap_bulanan/{bulanLalu}
-                // Sebagai fallback aman awal aplikasi, kita tetapkan base saldo default Rp2.000.000
-                let saldoBulanLalu = 2000000; 
-
-                let totalPemasukan = 0;
-                let totalPengeluaran = 0;
-                cacheSlipBulanIni = [];
-
-                // B. TARIK DATA DARI SUB-KOLEKSI REKAP_FINANCIAL
-                const q = query(collection(db, `users/${userId}/rekap_financal`));
-                const querySnapshot = await getDocs(q);
-
-                querySnapshot.forEach((doc) => {
-                    const data = doc.data();
-                    // Ambil timestamp transaksi
-                    let tglTransaksi = new Date();
-                    if (data.waktuTransaksi) {
-                        // Handle jika formatnya berupa Firestore Timestamp atau string ISO
-                        tglTransaksi = data.waktuTransaksi.seconds ? new Date(data.waktuTransaksi.seconds * 1000) : new Date(data.waktuTransaksi);
-                    }
-
-                    // Filter data khusus untuk bulan berjalan saat ini saja
-                    if (tglTransaksi.getMonth() === bulanSekarang && tglTransaksi.getFullYear() === tahunSekarang) {
-                        
-                        // Jika tipenya adalah slip masuk (kategori: gaji, thr, ksp)
-                        if (data.kategori === 'gaji' || data.kategori === 'thr' || data.kategori === 'ksp') {
-                            const nominalNetto = parseInt(data.totalBersihNetto || data.pendapatan || 0);
-                            totalPemasukan += nominalNetto;
-                            
-                            // Simpan ke cache untuk keperluan modal detail view
-                            cacheSlipBulanIni.push({
-                                id: doc.id,
-                                kategori: data.kategori.toUpperCase(),
-                                nominal: nominalNetto,
-                                tanggal: tglTransaksi.toLocaleDateString('id-ID', { day: 'numeric', month: 'short' })
-                            });
-                        } 
-                        // Jika tipenya pengeluaran transaksi keluar
-                        else if (data.kategori === 'pengeluaran' || data.kategori === 'belanja' || data.kategori === 'transfer') {
-                            totalPengeluaran += parseInt(data.nominalKeluar || data.pengeluaran || 0);
-                        }
-                    }
-                });
-
-                // C. HITUNG FORMULA SALDO UTAMA TERSEDIA
-                const saldoTersediaUtama = (saldoBulanLalu + totalPemasukan) - totalPengeluaran;
-
-                // D. SUNTIKKAN NILAI TERHITUNG KE ELEMENT UI DASHBOARD
-                document.getElementById('txt-saldo-lalu').innerText = formatRupiah(saldoBulanLalu);
-                document.getElementById('txt-pemasukan').innerText = `+${formatRupiah(totalPemasukan)}`;
-                document.getElementById('txt-pengeluaran').innerText = `-${formatRupiah(totalPengeluaran)}`;
-                document.getElementById('txt-saldo-utama').innerText = formatRupiah(saldoTersediaUtama);
-
-                // Render data ke tabel riwayat mutasi di dashboard bawah jika ada
-                if (typeof renderRiwayatTransaksiUI === "function") {
-                    renderRiwayatTransaksiUI(userId);
-                }
-
-            } catch (er) {
-                console.error("Gagal melakukan kalkulasi dashboard matematika rekap:", er);
-            }
-        }
-
-        // 3. FUNGSI LOGIKA MODAL POPUP DETAIL PEMASUKAN
-        window.bukaModalDetailPemasukan = function() {
-            document.getElementById('modal-detail-pemasukan').classList.remove('hidden');
-            const containerList = document.getElementById('list-slip-detail');
-            containerList.innerHTML = "";
-
-            if (cacheSlipBulanIni.length === 0) {
-                containerList.innerHTML = `<p class="text-center text-gray-400 py-6">Belum ada data slip yang diunggah bulan ini.</p>`;
+        // =================================================================
+        window.muatRekapFinansialDashboard = async function(uid) {
+            if (!uid) {
+                console.error("❌ UID tidak valid. Gagal memuat data dashboard.");
                 return;
             }
 
-            cacheSlipBulanIni.forEach(slip => {
-                let iconWarna = slip.kategori === 'GAJI' ? 'bg-blue-50 text-blue-600' : 'bg-amber-50 text-amber-600';
-                if(slip.kategori === 'KSP') iconWarna = 'bg-purple-50 text-purple-600';
+            if (!window.db) {
+                console.error("❌ Instance database (window.db) belum siap.");
+                return;
+            }
 
-                const itemHtml = `
-                    <div class="flex justify-between items-center p-3 bg-gray-50 border border-gray-100 rounded-xl">
-                        <div class="flex items-center gap-2.5">
-                            <div class="w-8 h-8 rounded-lg ${iconWarna} flex items-center justify-center font-bold text-[10px]">
-                                ${slip.kategori}
+            try {
+                console.log(`Mengambil data rekap_finansial via SDK untuk UID: ${uid}...`);
+                
+                // Ambil data sub-koleksi user menggunakan SDK internal
+                const referensiKoleksi = collection(window.db, "users", uid, "rekap_finansial");
+                const querySnapshot = await getDocs(referensiKoleksi);
+                
+                let totalPemasukan = 0;
+                let totalPengeluaran = 0; 
+
+                querySnapshot.forEach((doc) => {
+                    const dataData = doc.data();
+                    if (!dataData) return;
+
+                    // Akumulasikan semua totalBersihNetto tanpa filter kategori ke dalam Pemasukan
+                    const nominalBersih = parseInt(dataData.totalBersihNetto || 0);
+                    totalPemasukan += nominalBersih;
+                });
+
+                // Rumus perhitungan saldo tersedia dashboard
+                const sisaSaldoTersedia = totalPemasukan - totalPengeluaran;
+
+                // =================================================================
+                // INJEKSI HASIL HITUNG KE DASHBOARD UI DOMPETQ
+                // =================================================================
+                const elSaldo = document.getElementById('saldo-tersedia') || document.querySelector('.text-3xl.font-bold'); 
+                if (elSaldo) elSaldo.innerText = `Rp ${sisaSaldoTersedia.toLocaleString('id-ID')}`;
+
+                const elPemasukan = document.getElementById('total-pemasukan') || document.querySelector('.text-green-600') || document.querySelector('[class*="text-green"]');
+                if (elPemasukan) elPemasukan.innerText = `+Rp ${totalPemasukan.toLocaleString('id-ID')}`;
+
+                const elPengeluaran = document.getElementById('total-pengeluaran') || document.querySelector('.text-red-600') || document.querySelector('[class*="text-red"]');
+                if (elPengeluaran) elPengeluaran.innerText = `-Rp ${totalPengeluaran.toLocaleString('id-ID')}`;
+
+                console.log(`🚀 SINKRONISASI SUKSES! Saldo Terhitung: Rp ${sisaSaldoTersedia.toLocaleString('id-ID')}`);
+
+                // Simpan UID secara global agar bisa diakses saat modal detail dibuka
+                window.currentDeveloperUid = uid;
+
+            } catch (error) {
+                console.error("❌ Terjadi kesalahan kalkulasi dashboard saldo:", error);
+            }
+        };
+
+        // =================================================================
+        // 3. FUNGSI LOGIKA MODAL POPUP DETAIL PEMASUKAN (LIVE FIRESTORE + FILTER BULAN BERJALAN)
+        // =================================================================
+        window.bukaModalDetailPemasukan = async function() {
+            // 1. Tampilkan modal overlay terlebih dahulu
+            document.getElementById('modal-detail-pemasukan').classList.remove('hidden');
+            
+            const containerList = document.getElementById('list-slip-detail');
+            if (!containerList) return;
+            
+            containerList.innerHTML = `<p class="text-center text-gray-400 py-6"><i class="fas fa-spinner fa-spin mr-1"></i> Membaca database Firestore...</p>`;
+
+            const uid = window.currentDeveloperUid;
+            if (!uid || !window.db) {
+                containerList.innerHTML = `<p class="text-center text-red-500 py-6">Gagal memuat: Sesi pengguna tidak ditemukan.</p>`;
+                return;
+            }
+
+            try {
+                // 2. Dapatkan string waktu lokal bulan-tahun saat ini (Contoh hasil: "Juni 2026")
+                const opsiWaktu = { month: 'long', year: 'numeric' };
+                const periodeBulanSekarang = new Date().toLocaleDateString('id-ID', opsiWaktu); 
+
+                // 3. Tarik snapshot dokumen terbaru dari sub-koleksi rekap_finansial
+                const referensiKoleksi = collection(window.db, "users", uid, "rekap_finansial");
+                const querySnapshot = await getDocs(referensiKoleksi);
+                
+                let htmlKonten = "";
+                let jumlahSlipBulanIni = 0;
+
+                querySnapshot.forEach((doc) => {
+                    const data = doc.data();
+                    if (!data) return;
+
+                    // Bandingkan field 'periode' dari database dengan bulan berjalan saat ini
+                    const periodeSlip = data.periode || "";
+                    if (periodeSlip.trim().toLowerCase() === periodeBulanSekarang.trim().toLowerCase()) {
+                        jumlahSlipBulanIni++;
+
+                        // Pengkondisian warna badge kategori secara fleksibel
+                        const kat = (data.kategori || "Slip").toUpperCase();
+                        let badgeWarna = "bg-blue-50 text-blue-600 border-blue-100";
+                        if (kat === "KSP") badgeWarna = "bg-purple-50 text-purple-600 border-purple-100";
+                        if (kat === "THR") badgeWarna = "bg-amber-50 text-amber-600 border-amber-100";
+
+                        // Format string penunjuk waktu transaksi upload
+                        let teksWaktuUpload = "Baru Saja";
+                        if (data.waktuTransaksi) {
+                            teksWaktuUpload = data.waktuTransaksi.seconds ? 
+                                new Date(data.waktuTransaksi.seconds * 1000).toLocaleString('id-ID') : 
+                                data.waktuTransaksi;
+                        }
+
+                        // Susun item baris slip ke dalam list detail modal
+                        htmlKonten += `
+                            <div class="p-3.5 bg-gray-50 border border-gray-100 rounded-xl space-y-2.5 shadow-xs transition hover:border-gray-200">
+                                <div class="flex justify-between items-start">
+                                    <div class="flex items-center gap-2">
+                                        <span class="px-2 py-0.5 rounded-md text-[10px] font-bold border ${badgeWarna}">
+                                            ${kat}
+                                        </span>
+                                        <div class="text-[11px] text-gray-400 font-medium">${data.periode}</div>
+                                    </div>
+                                    <p class="font-black text-sm text-emerald-600">
+                                        Rp ${(parseInt(data.totalBersihNetto || 0)).toLocaleString('id-ID')}
+                                    </p>
+                                </div>
+                                
+                                <div class="pt-2 border-t border-dashed border-gray-200 text-[10px] text-gray-500 space-y-1 bg-white/50 p-2 rounded-lg">
+                                    <div class="flex justify-between">
+                                        <span><i class="far fa-user mr-1 text-gray-400"></i> Pengunggah:</span>
+                                        <span class="text-gray-700 font-semibold">Komputerwh2 Dev</span>
+                                    </div>
+                                    <div class="flex justify-between">
+                                        <span><i class="far fa-clock mr-1 text-gray-400"></i> Waktu Transaksi:</span>
+                                        <span class="text-gray-600 font-medium">${teksWaktuUpload}</span>
+                                    </div>
+                                    <div class="flex flex-col pt-1 border-t border-gray-100">
+                                        <span class="text-gray-400"><i class="far fa-file-code mr-1"></i> Reference Key Image:</span>
+                                        <span class="text-blue-600 font-mono mt-0.5 select-all break-all bg-blue-50/50 p-1 rounded border border-blue-100/50 text-[9px]">
+                                            ${data.referenceKeyImage || 'Tidak Ada Key'}
+                                        </span>
+                                    </div>
+                                </div>
+
+                                ${data.referenceKeyImage ? `
+                                <button onclick="window.bukaPratinjauSlipManual('${data.referenceKeyImage}')" class="w-full py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg font-semibold transition flex items-center justify-center gap-1.5 text-[10px] shadow-2xs active:scale-[0.99]">
+                                    <i class="fas fa-eye text-gray-400"></i> Lihat Pratinjau Slip Riil
+                                </button>` : ''}
                             </div>
-                            <div>
-                                <p class="font-bold text-gray-800">E-Slip Document Verified</p>
-                                <p class="text-[10px] text-gray-400">Diproses pada ${slip.tanggal}</p>
-                            </div>
+                        `;
+                    }
+                });
+
+                // 4. Fallback jika tidak ada data unggahan yang cocok di bulan berjalan
+                if (jumlahSlipBulanIni === 0) {
+                    htmlKonten = `
+                        <div class="text-center py-8 text-gray-400">
+                            <i class="fas fa-receipt text-3xl mb-2 text-gray-300 block"></i>
+                            Belum ada data dokumen slip terverifikasi untuk periode <span class="font-bold text-gray-700">${periodeBulanSekarang}</span>.
                         </div>
-                        <p class="font-black text-emerald-600">${formatRupiah(slip.nominal)}</p>
-                    </div>
-                `;
-                containerList.insertAdjacentHTML('beforeend', itemHtml);
-            });
+                    `;
+                }
+
+                containerList.innerHTML = htmlKonten;
+
+            } catch (error) {
+                console.error("❌ Gagal merender data detail pemasukan:", error);
+                containerList.innerHTML = `<p class="text-center text-red-500 py-6 text-xs">Gagal membaca data sinkronisasi Firestore.</p>`;
+            }
         };
 
         window.tutupModalDetailPemasukan = function() {
             document.getElementById('modal-detail-pemasukan').classList.add('hidden');
+        };
+
+        // Fungsi pratinjau pemicu key gambar
+        window.bukaPratinjauSlipManual = function(keyGambar) {
+            if (!keyGambar) return;
+            alert(`[DOMPETQ REALTIME ENGINE]\nMembuka berkas dokumen gambar slip dengan Key ID:\n\n${keyGambar}`);
         };
     </script>
 </body>
