@@ -638,7 +638,7 @@
             getRedirectResult,
             GoogleAuthProvider, 
             setPersistence, 
-            browserSessionPersistence 
+            browserLocalPersistence // DIUBAH: Menggunakan local agar sesi tidak hilang di HP saat redirect
         } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
         import { getFirestore, collection, getDocs } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
@@ -663,22 +663,20 @@
         window.signInWithPopup = signInWithPopup;
         window.signInWithRedirect = signInWithRedirect;
 
-        // === SOLUSI CRITICAL: EXPOSE FUNGSI SDK KE GLOBAL WINDOW ===
-        // Ini bertujuan agar file js eksternal Anda bebas memanggil fungsi tanpa error "not defined"
         window.fbCollection = collection;
         window.fbGetDocs = getDocs;
         
-        // 4. ATUR PERSISTENSI SESI
-        setPersistence(authInstance, browserSessionPersistence)
+        // 4. ATUR PERSISTENSI SESI (DIREVISI KE LOCAL AGAR MOBILE STABIL)
+        setPersistence(authInstance, browserLocalPersistence)
         .then(() => {
-            console.log("Sesi Firebase dikonfigurasi otomatis hancur saat aplikasi ditutup.");
+            console.log("Sesi Firebase dikonfigurasi menggunakan Local Persistence (Aman untuk HP & PC).");
         })
         .catch((error) => {
             console.error("Gagal menyetel persistensi sesi:", error);
         });
 
         // =================================================================
-        // REVISI TOTAL: LOGIKA LOGIN GOOGLE (MENDUKUNG POPUP & REDIRECT GITHUB PAGES)
+        // REVISI TOTAL: LOGIKA LOGIN GOOGLE (ADAPTIF DESKTOP & MOBILE)
         // =================================================================
         window.handleGoogleLogin = function() {
             if (typeof getarTombol === 'function') getarTombol();
@@ -691,13 +689,16 @@
             const provider = new window.GoogleAuthProvider();
             console.log("Membuka gerbang autentikasi Google...");
 
-            // Jika di GitHub Pages, gunakan Redirect untuk menghindari error COOP Popup Blocked
+            // DETEKSI AKURAT: Apakah pengguna memakai perangkat HP / Mobile?
+            const isMobileDevice = /Mobi|Android|iPhone|iPad|Windows Phone/i.test(navigator.userAgent);
             const isGitHubPages = window.location.hostname.includes("github.io");
 
-            if (isGitHubPages) {
-                console.log("Mendeteksi GitHub Pages: Mengalihkan via Redirect...");
+            // Jika di HP ATAU di GitHub Pages, gunakan REDIRECT agar terhindar dari pemblokiran sistem
+            if (isMobileDevice || isGitHubPages) {
+                console.log("Mendeteksi Perangkat Mobile/GitHub Pages: Mengalihkan via Redirect...");
                 window.signInWithRedirect(window.auth, provider);
             } else {
+                console.log("Mendeteksi Perangkat Desktop: Mengalihkan via Pop-up...");
                 window.signInWithPopup(window.auth, provider)
                     .then((result) => {
                         handleSuksesAuth(result.user);
@@ -748,10 +749,12 @@
         }
 
         // =================================================================
-        // AUTOMATIC AUTH MONITOR (SINKRONISASI AKTIF + DEV MODE SPECIFIC USER)
+        // AUTOMATIC AUTH MONITOR (SINKRONISASI AKTIF + DEV MODE)
         // =================================================================
         window.auth.onAuthStateChanged(async (user) => {
-            const IS_DEV_MODE = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+            const IS_DEV_MODE = window.location.hostname === "localhost" || 
+                                window.location.hostname === "127.0.0.1" || 
+                                window.location.protocol === "file:";
             
             if (IS_DEV_MODE) {
                 console.warn("⚠️ DOMPETQ: Berjalan di Mode Dev. Menggunakan Akun Komputerwh2.");
@@ -809,7 +812,7 @@
         }
 
         // =================================================================
-        // PROSES BYPASS LOGIN DEVELOPER MANUAL (CARA KEDUA)
+        // PROSES BYPASS LOGIN DEVELOPER MANUAL
         // =================================================================
         window.masukModeDeveloperCepat = async function() {
             console.warn("⚠️ DOMPETQ: Memicu bypass login developer secara manual...");
@@ -1849,56 +1852,86 @@
 
 
         // =================================================================
-        // 2. AMBIL DATA REALTIME DARI FIRESTORE & HITUNG BERDASARKAN RUMUS DASHBOARD
+        // 2. AMBIL DATA REALTIME DARI FIRESTORE FLAT & HITUNG DASHBOARD (SECURE AUTH)
         // =================================================================
         window.muatRekapFinansialDashboard = async function(uid) {
-            if (!uid) {
-                console.error("❌ UID tidak valid. Gagal memuat data dashboard.");
-                return;
-            }
-
-            if (!window.db) {
-                console.error("❌ Instance database (window.db) belum siap.");
+            // Catatan: UID tetap diterima agar tidak merusak alur onAuthStateChanged Anda
+            if (!window.auth || !window.auth.currentUser) {
+                console.error("❌ User belum terotentikasi Google. Gagal memuat data dashboard.");
                 return;
             }
 
             try {
-                console.log(`Mengambil data rekap_finansial via SDK untuk UID: ${uid}...`);
+                console.log("Mengambil rekap bulanan flat untuk kalkulasi angka Dashboard UI...");
                 
-                // Ambil data sub-koleksi user menggunakan SDK internal
-                const referensiKoleksi = collection(window.db, "users", uid, "rekap_finansial");
-                const querySnapshot = await getDocs(referensiKoleksi);
+                // 1. Ambil token otentikasi aktif user Google
+                const userToken = await window.auth.currentUser.getIdToken();
+
+                // 2. Hitung nama dokumen berdasarkan bulan saat ini (Contoh: "Juni 2026" -> "juni_2026")
+                const opsiWaktu = { month: 'long', year: 'numeric' };
+                let periodeBulanSekarang = new Date().toLocaleDateString('id-ID', opsiWaktu); 
+                periodeBulanSekarang = periodeBulanSekarang.replace(/\b\w/g, c => c.toUpperCase());
+                const formatPeriodeClean = periodeBulanSekarang.trim().toLowerCase().replace(/\s+/g, '_');
+
+                const projectId = window.firebaseConfig?.projectId || "dompetq-app";
+                const daftarKategori = ["gaji", "ksp", "thr"];
                 
                 let totalPemasukan = 0;
-                let totalPengeluaran = 0; 
+                let totalPengeluaran = 0; // Siapkan nilai 0 untuk pengeluaran (atau sesuaikan jika ada fitur pengeluaran flat)
 
-                querySnapshot.forEach((doc) => {
-                    const dataData = doc.data();
-                    if (!dataData) return;
-
-                    // Akumulasikan semua totalBersihNetto tanpa filter kategori ke dalam Pemasukan
-                    const nominalBersih = parseInt(dataData.totalBersihNetto || 0);
-                    totalPemasukan += nominalBersih;
+                // 3. Lakukan fetch paralel ke 3 dokumen flat di Firestore seperti logika modal detail
+                const requestPromises = daftarKategori.map(async (kat) => {
+                    const docId = `${kat}_${formatPeriodeClean}`;
+                    const endpointUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial/${docId}`;
+                    
+                    try {
+                        const respon = await fetch(endpointUrl, {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `Bearer ${userToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
+                        if (respon.ok) {
+                            const docJson = await respon.json();
+                            const fields = docJson.fields || {};
+                            // Ambil nominal integer dari Firestore string/integer value
+                            const nominalBersih = parseInt(fields.totalBersihNetto?.integerValue || 0);
+                            return nominalBersih;
+                        }
+                    } catch (e) {
+                        console.error(`Gagal akumulasi nominal dashboard untuk kategori ${kat}:`, e);
+                    }
+                    return 0;
                 });
 
-                // Rumus perhitungan saldo tersedia dashboard
+                // Tunggu semua data ditarik
+                const hasilKalkulasi = await Promise.allSettled(requestPromises);
+                hasilKalkulasi.forEach(hasil => {
+                    if (hasil.status === 'fulfilled') {
+                        totalPemasukan += hasil.value;
+                    }
+                });
+
+                // 4. Hitung Saldo Bersih sesuai Rumus Dashboard
                 const sisaSaldoTersedia = totalPemasukan - totalPengeluaran;
 
                 // =================================================================
-                // INJEKSI HASIL HITUNG KE DASHBOARD UI DOMPETQ
+                // INJEKSI HASIL HITUNG KE DASHBOARD UI DOMPETQ (FIXED RP0)
                 // =================================================================
                 const elSaldo = document.getElementById('saldo-tersedia') || document.querySelector('.text-3xl.font-bold'); 
                 if (elSaldo) elSaldo.innerText = `Rp ${sisaSaldoTersedia.toLocaleString('id-ID')}`;
 
-                const elPemasukan = document.getElementById('total-pemasukan') || document.querySelector('.text-green-600') || document.querySelector('[class*="text-green"]');
+                const elPemasukan = document.getElementById('total-pemasukan') || document.getElementById('ocr-pemasukan') || document.querySelector('.text-green-600') || document.querySelector('[class*="text-green"]');
                 if (elPemasukan) elPemasukan.innerText = `+Rp ${totalPemasukan.toLocaleString('id-ID')}`;
 
                 const elPengeluaran = document.getElementById('total-pengeluaran') || document.querySelector('.text-red-600') || document.querySelector('[class*="text-red"]');
                 if (elPengeluaran) elPengeluaran.innerText = `-Rp ${totalPengeluaran.toLocaleString('id-ID')}`;
 
-                console.log(`🚀 SINKRONISASI SUKSES! Saldo Terhitung: Rp ${sisaSaldoTersedia.toLocaleString('id-ID')}`);
-
-                // Simpan UID secara global agar bisa diakses saat modal detail dibuka
+                console.log(`🚀 DASHBOARD REKAP BULANAN SYNCED: Rp ${totalPemasukan.toLocaleString('id-ID')}`);
+                
+                // Simpan UID secara global jika dibutuhkan modul lain
                 window.currentDeveloperUid = uid;
 
             } catch (error) {
