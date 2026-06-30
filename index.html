@@ -1409,11 +1409,11 @@
 
                 // 3. VALIDASI ANTI-FRAUD DISESUAIKAN DENGAN LOG KONSOL
                 let apakahValid = false;
-                if (jenisKategori === 'gaji' && (teksUtuh.includes('gaji') || teksUtuh.includes('slip') || teksUtuh.includes('cap') || teksUtuh.includes('4.509'))) {
+                if (jenisKategori === 'gaji' && (teksUtuh.includes('slip gaji') || teksUtuh.includes('periode gaji') || teksUtuh.includes('total pendapatan') || teksUtuh.includes('total potongan'))) {
                     apakahValid = true; // Toleransi pembacaan 'slip cap' dari cetakan Marifood
-                } else if (jenisKategori === 'thr' && (teksUtuh.includes('thr') || teksUtuh.includes('tunjangan') || teksUtuh.includes('fitri'))) {
+                } else if (jenisKategori === 'thr' && (teksUtuh.includes('slip thr') || teksUtuh.includes('thr diterima') || teksUtuh.includes('fitri'))) {
                     apakahValid = true;
-                } else if (jenisKategori === 'ksp' && (teksUtuh.includes('netto') || teksUtuh.includes('tabungan') || teksUtuh.includes('total') || teksUtuh.includes('bunga'))) {
+                } else if (jenisKategori === 'ksp' && (teksUtuh.includes('netto'))) {
                     apakahValid = true;
                 }
 
@@ -1553,7 +1553,7 @@
         }
 
         // =================================================================
-        // FUNGSIONALITAS AKHIR: SIMPAN DATA SPLIT (FIRESTORE + RTDB)
+        // FUNGSIONALITAS AKHIR: SIMPAN DATA SPLIT (FIRESTORE + RTDB) - FIXED
         // =================================================================
         window.simpanDataOcr = async function() {
             const jenisKategori = document.getElementById('jenis-slip').value;
@@ -1575,18 +1575,23 @@
             const uid = window.auth.currentUser.uid;
             const keyTransaksi = `ocr_${Date.now()}`;
 
-            // Ambil string database url secara dinamis, jika config window kosong gunakan fallback manual url app Anda
-            const rtdbBaseUrl = window.firebaseConfig?.databaseURL 
-                ? window.firebaseConfig.databaseURL 
-                : "dompetq-app-default-rtdb.firebaseio.com"; // <-- Sesuaikan dengan nama project database Realtime Anda jika error tetap muncul
-
             try {
                 tampilAlert("Sedang menyinkronkan berkas ke cloud server...", "info");
 
+                // --- AMBIL TOKEN OTENTIKASI USER AKTIF (WAJIB UNTUK TEMBUS SECURITY RULES) ---
+                const userToken = await window.auth.currentUser.getIdToken(true);
+
+                // 1. Ekstrak Host RTDB secara aman tanpa protocol https:// dan tanpa trailing slash
+                let rtdbHost = window.firebaseConfig?.databaseURL 
+                    ? window.firebaseConfig.databaseURL.replace(/^https?:\/\//, '').replace(/\/$/, '')
+                    : "dompetq-app-default-rtdb.asia-southeast1.firebasedatabase.app"; // Fallback host murni
+
                 // --- PROSES 1: SIMPAN GAMBAR BASE64 KE FIREBASE REALTIME DATABASE ---
                 if (globalCompressedImageBase64) {
-                    const endpointRtdb = `https://${rtdbBaseUrl}/users/${uid}/dokumen_ocr/${keyTransaksi}.json`;
-                    await fetch(endpointRtdb, {
+                    // Ditambahkan ?auth=${userToken} agar diverifikasi oleh Realtime Database Rules
+                    const endpointRtdb = `https://${rtdbHost}/users/${uid}/dokumen_ocr/${keyTransaksi}.json?auth=${userToken}`;
+                    
+                    const responRtdb = await fetch(endpointRtdb, {
                         method: 'PUT',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -1595,12 +1600,17 @@
                             diunggahPada: new Date().toISOString()
                         })
                     });
+
+                    if (!responRtdb.ok) {
+                        throw new Error(`RTDB Gagal: ${responRtdb.statusText}`);
+                    }
                     console.log("Gambar sukses diunggah ke Realtime Database.");
                 }
 
                 // --- PROSES 2: SIMPAN REKAP TRANSAKSI FINANSIAL KE CLOUD FIRESTORE ---
                 const projectId = window.firebaseConfig?.projectId || "dompetq-app";
-                const endpointFirestore = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}/rekap_finansial/?documentId=${keyTransaksi}`;
+                // Menggunakan POST ke base path collection sesuai standar REST API Firestore v1
+                const endpointFirestore = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${uid}/rekap_finansial?documentId=${keyTransaksi}`;
 
                 const payloadFirestore = {
                     fields: {
@@ -1614,11 +1624,18 @@
                     }
                 };
 
-                await fetch(endpointFirestore, {
+                const responFirestore = await fetch(endpointFirestore, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}` // Mengirim token di header agar tembus Firestore Rules
+                    },
                     body: JSON.stringify(payloadFirestore)
                 });
+
+                if (!responFirestore.ok) {
+                    throw new Error(`Firestore Gagal: ${responFirestore.statusText}`);
+                }
 
                 tampilAlert(`Sukses! Rekapitulasi ${jenisKategori.toUpperCase()} berhasil dibukukan ke sistem database.`, "success");
                 window.tutupModal();
