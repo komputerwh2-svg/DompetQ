@@ -1709,123 +1709,123 @@
         }
 
         // =================================================================
-// FUNGSIONALITAS AKHIR: SIMPAN DATA FLAT (FIXED AUTH FOR GITHUB PAGES)
-// =================================================================
-window.simpanDataOcr = async function() {
-    const jenisKategori = document.getElementById('jenis-slip').value;
-    const pendapatan = parseInt(document.getElementById('ocr-pendapatan').value) || 0;
-    const potongan = parseInt(document.getElementById('ocr-potongan').value) || 0;
-    const netto = parseInt(document.getElementById('ocr-bersih').value) || 0;
-    const periode = document.getElementById('ocr-bersih').getAttribute('data-extracted-periode') || "Juni 2026";
+        // FUNGSIONALITAS AKHIR: SIMPAN DATA FLAT (FIXED AUTH FOR GITHUB PAGES)
+        // =================================================================
+        window.simpanDataOcr = async function() {
+            const jenisKategori = document.getElementById('jenis-slip').value;
+            const pendapatan = parseInt(document.getElementById('ocr-pendapatan').value) || 0;
+            const potongan = parseInt(document.getElementById('ocr-potongan').value) || 0;
+            const netto = parseInt(document.getElementById('ocr-bersih').value) || 0;
+            const periode = document.getElementById('ocr-bersih').getAttribute('data-extracted-periode') || "Juni 2026";
 
-    if (pendapatan <= 0) {
-        tampilAlert("Gagal menyimpan! Isian nominal data tidak valid.", "warning");
-        return;
-    }
+            if (pendapatan <= 0) {
+                tampilAlert("Gagal menyimpan! Isian nominal data tidak valid.", "warning");
+                return;
+            }
 
-    // 1. VALIDASI WAJIB LOGIN (KARENA LIVE DI GITHUB PAGES)
-    if (!window.auth || !window.auth.currentUser) {
-        tampilAlert("Sesi login tidak ditemukan. Silakan login ulang dengan Google.", "error");
-        return;
-    }
+            // 1. VALIDASI WAJIB LOGIN (KARENA LIVE DI GITHUB PAGES)
+            if (!window.auth || !window.auth.currentUser) {
+                tampilAlert("Sesi login tidak ditemukan. Silakan login ulang dengan Google.", "error");
+                return;
+            }
 
-    const userAktif = window.auth.currentUser;
-    let namaUserSistem = "user_dompetq";
-    if (userAktif.email && userAktif.email.includes("@")) {
-        namaUserSistem = userAktif.email.split('@')[0];
-    }
+            const userAktif = window.auth.currentUser;
+            let namaUserSistem = "user_dompetq";
+            if (userAktif.email && userAktif.email.includes("@")) {
+                namaUserSistem = userAktif.email.split('@')[0];
+            }
 
-    try {
-        tampilAlert("Mengambil token keamanan Firebase...", "info");
-        
-        // AMBIL TOKEN ASLI USER YANG SEDANG LOGIN
-        const userToken = await userAktif.getIdToken(true);
-
-        // FORMAT KEY ID UNIK: kategori_periode (Contoh: thr_juni_2026)
-        const formatPeriodeClean = periode.trim().toLowerCase().replace(/\s+/g, '_');
-        const formatKategoriClean = jenisKategori.trim().toLowerCase();
-        const keyTransaksi = `${formatKategoriClean}_${formatPeriodeClean}`;
-
-        const projectId = window.firebaseConfig?.projectId || "dompetq-app";
-        let rtdbHost = window.firebaseConfig?.databaseURL 
-            ? window.firebaseConfig.databaseURL.replace(/^https?:\/\//, '').replace(/\/$/, '')
-            : "dompetq-app-default-rtdb.asia-southeast1.firebasedatabase.app";
-
-        // --- PROSES 1: SIMPAN KE FIREBASE REALTIME DATABASE ---
-        if (typeof globalCompressedImageBase64 !== 'undefined' && globalCompressedImageBase64) {
-            // Melampirkan token via query parameter (?auth=TOKEN) sesuai regulasi REST API RTDB
-            let endpointRtdb = `https://${rtdbHost}/${keyTransaksi}.json?auth=${userToken}`;
-            
             try {
-                const responRtdb = await fetch(endpointRtdb, {
-                    method: 'PUT',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        tipeSlip: jenisKategori,
-                        berkasGambar: globalCompressedImageBase64,
-                        diunggahPada: new Date().toISOString(),
-                        namaUser: namaUserSistem
-                    })
+                tampilAlert("Mengambil token keamanan Firebase...", "info");
+                
+                // AMBIL TOKEN ASLI USER YANG SEDANG LOGIN
+                const userToken = await userAktif.getIdToken(true);
+
+                // FORMAT KEY ID UNIK: kategori_periode (Contoh: thr_juni_2026)
+                const formatPeriodeClean = periode.trim().toLowerCase().replace(/\s+/g, '_');
+                const formatKategoriClean = jenisKategori.trim().toLowerCase();
+                const keyTransaksi = `${formatKategoriClean}_${formatPeriodeClean}`;
+
+                const projectId = window.firebaseConfig?.projectId || "dompetq-app";
+                let rtdbHost = window.firebaseConfig?.databaseURL 
+                    ? window.firebaseConfig.databaseURL.replace(/^https?:\/\//, '').replace(/\/$/, '')
+                    : "dompetq-app-default-rtdb.asia-southeast1.firebasedatabase.app";
+
+                // --- PROSES 1: SIMPAN KE FIREBASE REALTIME DATABASE ---
+                if (typeof globalCompressedImageBase64 !== 'undefined' && globalCompressedImageBase64) {
+                    // Melampirkan token via query parameter (?auth=TOKEN) sesuai regulasi REST API RTDB
+                    let endpointRtdb = `https://${rtdbHost}/${keyTransaksi}.json?auth=${userToken}`;
+                    
+                    try {
+                        const responRtdb = await fetch(endpointRtdb, {
+                            method: 'PUT',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                tipeSlip: jenisKategori,
+                                berkasGambar: globalCompressedImageBase64,
+                                diunggahPada: new Date().toISOString(),
+                                namaUser: namaUserSistem
+                            })
+                        });
+
+                        if (!responRtdb.ok) {
+                            throw new Error(`RTDB Gagal: ${responRtdb.status} - ${responRtdb.statusText}`);
+                        }
+                        console.log(`Gambar sukses disimpan di RTDB: /${keyTransaksi}`);
+                    } catch (rtdbErr) {
+                        console.error("Gagal simpan gambar ke RTDB:", rtdbErr);
+                        throw rtdbErr;
+                    }
+                }
+
+                // --- PROSES 2: SIMPAN KE CLOUD FIRESTORE ---
+                const endpointFirestore = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial/${keyTransaksi}`;
+
+                const payloadFirestore = {
+                    fields: {
+                        kategori: { stringValue: jenisKategori },
+                        periode: { stringValue: periode },
+                        pendapatan: { integerValue: pendapatan.toString() },
+                        potongan: { integerValue: potongan.toString() },
+                        totalBersihNetto: { integerValue: netto.toString() },
+                        referenceKeyImage: { stringValue: keyTransaksi },
+                        waktuTransaksi: { timestampValue: new Date().toISOString() },
+                        namaUser: { stringValue: namaUserSistem }
+                    }
+                };
+
+                // Melampirkan token via Authorization Header (Bearer) agar lolos dari Security Rules
+                const headersFirestore = { 
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${userToken}`
+                };
+
+                console.log(`Mengirim rekap flat ke Firestore (PATCH) dengan Otorisasi User.`);
+                const responFirestore = await fetch(endpointFirestore, {
+                    method: 'PATCH',
+                    headers: headersFirestore,
+                    body: JSON.stringify(payloadFirestore)
                 });
 
-                if (!responRtdb.ok) {
-                    throw new Error(`RTDB Gagal: ${responRtdb.status} - ${responRtdb.statusText}`);
+                if (!responFirestore.ok) {
+                    const errTxt = await responFirestore.text();
+                    throw new Error(`Firestore Error: ${responFirestore.status} - ${errTxt}`);
                 }
-                console.log(`Gambar sukses disimpan di RTDB: /${keyTransaksi}`);
-            } catch (rtdbErr) {
-                console.error("Gagal simpan gambar ke RTDB:", rtdbErr);
-                throw rtdbErr;
-            }
-        }
+                
+                console.log(`Data rekap sukses disimpan di Firestore: rekap_finansial/${keyTransaksi}`);
 
-        // --- PROSES 2: SIMPAN KE CLOUD FIRESTORE ---
-        const endpointFirestore = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial/${keyTransaksi}`;
+                // --- BERHASIL ---
+                tampilAlert(`Sukses! Rekapitulasi ${jenisKategori.toUpperCase()} berhasil dibukukan ke Firebase Cloud.`, "success");
+                
+                if (typeof window.tutupModal === 'function') {
+                    window.tutupModal();
+                }
 
-        const payloadFirestore = {
-            fields: {
-                kategori: { stringValue: jenisKategori },
-                periode: { stringValue: periode },
-                pendapatan: { integerValue: pendapatan.toString() },
-                potongan: { integerValue: potongan.toString() },
-                totalBersihNetto: { integerValue: netto.toString() },
-                referenceKeyImage: { stringValue: keyTransaksi },
-                waktuTransaksi: { timestampValue: new Date().toISOString() },
-                namaUser: { stringValue: namaUserSistem }
+            } catch (error) {
+                console.error("Firebase API Sync Error:", error);
+                tampilAlert(`Gagal Sinkronisasi Firebase: ${error.message}`, "error");
             }
         };
-
-        // Melampirkan token via Authorization Header (Bearer) agar lolos dari Security Rules
-        const headersFirestore = { 
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${userToken}`
-        };
-
-        console.log(`Mengirim rekap flat ke Firestore (PATCH) dengan Otorisasi User.`);
-        const responFirestore = await fetch(endpointFirestore, {
-            method: 'PATCH',
-            headers: headersFirestore,
-            body: JSON.stringify(payloadFirestore)
-        });
-
-        if (!responFirestore.ok) {
-            const errTxt = await responFirestore.text();
-            throw new Error(`Firestore Error: ${responFirestore.status} - ${errTxt}`);
-        }
-        
-        console.log(`Data rekap sukses disimpan di Firestore: rekap_finansial/${keyTransaksi}`);
-
-        // --- BERHASIL ---
-        tampilAlert(`Sukses! Rekapitulasi ${jenisKategori.toUpperCase()} berhasil dibukukan ke Firebase Cloud.`, "success");
-        
-        if (typeof window.tutupModal === 'function') {
-            window.tutupModal();
-        }
-
-    } catch (error) {
-        console.error("Firebase API Sync Error:", error);
-        tampilAlert(`Gagal Sinkronisasi Firebase: ${error.message}`, "error");
-    }
-};
 
         window.hitungNetto = function() {
             const pendapatan = parseFloat(document.getElementById('ocr-pendapatan').value) || 0;
@@ -1907,7 +1907,7 @@ window.simpanDataOcr = async function() {
         };
 
         // =================================================================
-        // 3. FUNGSI LOGIKA MODAL POPUP DETAIL PEMASUKAN - STRUKTUR RAMBUT FLAT
+        // 3. FUNGSI LOGIKA MODAL POPUP DETAIL PEMASUKAN - STRUKTUR FLAT SECURE
         // =================================================================
         window.bukaModalDetailPemasukan = async function() {
             const modalEl = document.getElementById('modal-detail-pemasukan');
@@ -1916,10 +1916,18 @@ window.simpanDataOcr = async function() {
             const containerList = document.getElementById('list-slip-detail');
             if (!containerList) return;
             
-            containerList.innerHTML = `<p class="text-center text-gray-400 py-6 text-xs"><i class="fas fa-spinner fa-spin mr-1 text-blue-500"></i> Membaca database Firestore...</p>`;
+            containerList.innerHTML = `<p class="text-center text-gray-400 py-6 text-xs"><i class="fas fa-spinner fa-spin mr-1 text-blue-500"></i> Membaca database Firestore Terproteksi...</p>`;
+
+            // Proteksi Awal: Cek Sesi Login Akun Google
+            if (!window.auth || !window.auth.currentUser) {
+                containerList.innerHTML = `<p class="text-center text-amber-500 py-6 text-xs"><i class="fas fa-exclamation-triangle mr-1"></i> Sesi berakhir. Silakan login ulang dengan akun Google Anda.</p>`;
+                return;
+            }
 
             try {
-                // Dapatkan string periode bulan saat ini (Contoh: "Juni 2026")
+                // Ambil token keamanan asli untuk melakukan pembacaan data cloud
+                const userToken = await window.auth.currentUser.getIdToken(true);
+
                 const opsiWaktu = { month: 'long', year: 'numeric' };
                 let periodeBulanSekarang = new Date().toLocaleDateString('id-ID', opsiWaktu); 
                 periodeBulanSekarang = periodeBulanSekarang.replace(/\b\w/g, c => c.toUpperCase());
@@ -1930,13 +1938,20 @@ window.simpanDataOcr = async function() {
                 const daftarKategori = ["gaji", "ksp", "thr"];
                 let listDataDitemukan = [];
 
-                // Lakukan fetch langsung secara paralel ke ID dokumen root rekap_finansial
+                // Lakukan fetch paralel dengan header otentikasi
                 const requestPromises = daftarKategori.map(async (kat) => {
                     const docId = `${kat}_${formatPeriodeClean}`;
                     const endpointUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial/${docId}`;
                     
                     try {
-                        const respon = await fetch(endpointUrl);
+                        const respon = await fetch(endpointUrl, {
+                            method: 'GET',
+                            headers: {
+                                'Authorization': `Bearer ${userToken}`,
+                                'Content-Type': 'application/json'
+                            }
+                        });
+                        
                         if (respon.ok) {
                             const docJson = await respon.json();
                             const fields = docJson.fields || {};
@@ -1946,10 +1961,12 @@ window.simpanDataOcr = async function() {
                                 totalBersihNetto: fields.totalBersihNetto?.integerValue || 0,
                                 referenceKeyImage: fields.referenceKeyImage?.stringValue || docId,
                                 waktuTransaksi: fields.waktuTransaksi?.timestampValue || null,
-                                namaUser: fields.namaUser?.stringValue || "komputerwh2"
+                                namaUser: fields.namaUser?.stringValue || "User"
                             };
                         }
-                    } catch (e) {}
+                    } catch (e) {
+                        console.error(`Gagal memuat kategori ${kat}:`, e);
+                    }
                     return null;
                 });
 
@@ -1991,7 +2008,7 @@ window.simpanDataOcr = async function() {
                             <div class="pt-2 border-t border-dashed border-gray-200 text-[10px] text-gray-500 space-y-1 bg-white/50 p-2 rounded-lg">
                                 <div class="flex justify-between">
                                     <span><i class="far fa-user mr-1 text-gray-400"></i> Pengunggah:</span>
-                                    <span class="text-gray-700 font-semibold">${data.namaUser} Dev</span>
+                                    <span class="text-gray-700 font-semibold">${data.namaUser}</span>
                                 </div>
                                 <div class="flex justify-between">
                                     <span><i class="far fa-clock mr-1 text-gray-400"></i> Waktu Transaksi:</span>
@@ -2000,7 +2017,7 @@ window.simpanDataOcr = async function() {
                             </div>
 
                             <button onclick="window.bukaPratinjauSlipManual('${data.referenceKeyImage}')" class="w-full py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg font-semibold transition flex items-center justify-center gap-1.5 text-[10px] shadow-2xs">
-                                <i class="fas fa-eye text-gray-400"></i> Lihat Pratinjau Slip Riil
+                                <i class="fas fa-image text-blue-500"></i> Lihat Pratinjau Slip Riil
                             </button>
                         </div>
                     `;
@@ -2019,7 +2036,7 @@ window.simpanDataOcr = async function() {
 
             } catch (error) {
                 console.error("❌ Gagal:", error);
-                containerList.innerHTML = `<p class="text-center text-red-500 py-6 text-xs">Gagal membaca data sinkronisasi Firestore.</p>`;
+                containerList.innerHTML = `<p class="text-center text-red-500 py-6 text-xs">Gagal membaca data dari Firestore Secure Node.</p>`;
             }
         };
 
@@ -2028,10 +2045,56 @@ window.simpanDataOcr = async function() {
             if (modalEl) modalEl.classList.add('hidden');
         };
 
-        // Fungsi pratinjau pemicu key gambar
-        window.bukaPratinjauSlipManual = function(keyGambar) {
+        // =================================================================
+        // 4. FUNGSIONALITAS BARU: KONEKSI & RENDER GAMBAR DARI RTDB
+        // =================================================================
+        window.bukaPratinjauSlipManual = async function(keyGambar) {
             if (!keyGambar) return;
-            tampilAlert(`[DOMPETQ REALTIME ENGINE]\nMembuka berkas dokumen gambar slip dengan Key ID:\n\n${keyGambar}`);
+            
+            if (!window.auth || !window.auth.currentUser) {
+                alert("Sesi pratinjau ditolak. Sila lakukan login ulang akun Google.");
+                return;
+            }
+
+            tampilAlert("Sedang mengunduh berkas slip asli dari RTDB Cloud...", "info");
+
+            try {
+                const userToken = await window.auth.currentUser.getIdToken(true);
+                let rtdbHost = window.firebaseConfig?.databaseURL 
+                    ? window.firebaseConfig.databaseURL.replace(/^https?:\/\//, '').replace(/\/$/, '')
+                    : "dompetq-app-default-rtdb.asia-southeast1.firebasedatabase.app";
+
+                // Request data gambar ke root RTDB menggunakan token autentikasi (?auth=)
+                const urlTarget = `https://${rtdbHost}/${keyGambar}.json?auth=${userToken}`;
+                const respon = await fetch(urlTarget);
+
+                if (!respon.ok) throw new Error("Gagal mengunduh data gambar dari server RTDB.");
+
+                const jsonResult = await respon.json();
+
+                if (jsonResult && jsonResult.berkasGambar) {
+                    // Render gambar base64 ke dalam window baru via iframe
+                    const blobWindow = window.open();
+                    if(blobWindow) {
+                        blobWindow.document.write(`
+                            <html>
+                            <head><title>Pratinjau Slip - ${keyGambar}</title></head>
+                            <body style="margin:0; background:#1e293b; display:flex; justify-content:center; items-center; height:100vh;">
+                                <img src="${jsonResult.berkasGambar}" style="max-width:100%; max-height:100vh; object-fit:contain; box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);" />
+                            </body>
+                            </html>
+                        `);
+                        blobWindow.document.close();
+                    } else {
+                        alert("Gagal membuka jendela pratinjau. Pastikan pop-up browser tidak diblokir.");
+                    }
+                } else {
+                    tampilAlert("Berkas master dokumen gambar asli tidak ditemukan di server RTDB.", "warning");
+                }
+            } catch (err) {
+                console.error("Gagal memuat pratinjau:", err);
+                alert(`Gagal memuat gambar: ${err.message}`);
+            }
         };
     </script>
 </body>
