@@ -1943,7 +1943,7 @@
         };
 
         // =================================================================
-// 3. FUNGSI LOGIKA MODAL POPUP DETAIL PEMASUKAN (FIXED BYPASS 403 FOR DEV MODE)
+// 3. FUNGSI LOGIKA MODAL POPUP DETAIL PEMASUKAN (FIXED ERROR 404 BYPASS)
 // =================================================================
 window.bukaModalDetailPemasukan = async function() {
     // 1. Tampilkan modal overlay terlebih dahulu
@@ -1985,7 +1985,7 @@ window.bukaModalDetailPemasukan = async function() {
 
         // 4. STRATEGI AMAN: CEK DENGAN REST API ATAU SDK
         if (!IS_DEV_MODE && typeof collection === 'function' && typeof getDocs === 'function' && window.db) {
-            // Jalur Production menggunakan SDK Resmi (Aman dari 403 karena ada auth)
+            // Jalur Production menggunakan SDK Resmi
             const referensiKoleksi = collection(window.db, "users", namaUserSistem, "rekap_finansial");
             const querySnapshot = await getDocs(referensiKoleksi);
             querySnapshot.forEach((doc) => {
@@ -2001,32 +2001,40 @@ window.bukaModalDetailPemasukan = async function() {
                 }
             });
         } else {
-            // Jalur Developer Mode / REST API: Tembak langsung ID dokumen spesifik untuk menghindari rule 403 list block!
-            console.log(`🔧 DEV MODE: Menembak direct document ID untuk menghindari error 403 Forbidden.`);
+            // Jalur Developer Mode / REST API: Direct document fetches
+            console.log(`🔧 DEV MODE: Mengambil dokumen terpisah secara modular.`);
             const projectId = window.firebaseConfig?.projectId || "dompetq-app";
-            
-            // Daftar kategori slip yang ada pada sistem DompetQ Anda
             const daftarKategori = ["gaji", "ksp", "thr"];
             
-            // Buat request parallel untuk efisiensi waktu
             const requestPromises = daftarKategori.map(async (kat) => {
-                const docId = `${kat}_${formatPeriodeClean}`; // Contoh: gaji_juni_2026
+                const docId = `${kat}_${formatPeriodeClean}`;
                 const endpointUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/users/${namaUserSistem}/rekap_finansial/${docId}`;
                 
                 const headers = { 'Content-Type': 'application/json' };
                 if (userToken) headers['Authorization'] = `Bearer ${userToken}`;
 
-                const respon = await fetch(endpointUrl, { headers });
-                if (respon.ok) {
-                    const docJson = await respon.json();
-                    const fields = docJson.fields || {};
-                    return {
-                        kategori: fields.kategori?.stringValue || kat,
-                        periode: fields.periode?.stringValue || periodeBulanSekarang,
-                        totalBersihNetto: fields.totalBersihNetto?.integerValue || 0,
-                        referenceKeyImage: fields.referenceKeyImage?.stringValue || docId,
-                        waktuTransaksi: fields.waktuTransaksi?.timestampValue || null
-                    };
+                try {
+                    const respon = await fetch(endpointUrl, { headers });
+                    
+                    if (respon.status === 404) {
+                        // PERBAIKAN UTAMA: Jika data kategori tidak ditemukan di cloud, abaikan tanpa memutus alur
+                        console.warn(`💡 Info Dev: Dokumen data '${docId}' belum dibuat di Firebase.`);
+                        return null;
+                    }
+
+                    if (respon.ok) {
+                        const docJson = await respon.json();
+                        const fields = docJson.fields || {};
+                        return {
+                            kategori: fields.kategori?.stringValue || kat,
+                            periode: fields.periode?.stringValue || periodeBulanSekarang,
+                            totalBersihNetto: fields.totalBersihNetto?.integerValue || 0,
+                            referenceKeyImage: fields.referenceKeyImage?.stringValue || docId,
+                            waktuTransaksi: fields.waktuTransaksi?.timestampValue || null
+                        };
+                    }
+                } catch (err) {
+                    console.error(`Gagal memproses request ${docId}:`, err);
                 }
                 return null;
             });
@@ -2096,7 +2104,6 @@ window.bukaModalDetailPemasukan = async function() {
             `;
         });
 
-        // 6. Fallback jika tidak ada data sama sekali
         if (listDataDitemukan.length === 0) {
             htmlKonten = `
                 <div class="text-center py-8 text-gray-400 text-xs">
@@ -2110,7 +2117,7 @@ window.bukaModalDetailPemasukan = async function() {
 
     } catch (error) {
         console.error("❌ Gagal merender data detail pemasukan:", error);
-        containerList.innerHTML = `<p class="text-center text-red-500 py-6 text-xs">Gagal membaca data sinkronisasi Firestore.<br><span class="font-mono text-[9px] text-red-400">${error.message}</span></p>`;
+        containerList.innerHTML = `<p class="text-center text-red-500 py-6 text-xs">Gagal membaca data sinkronisasi Firestore.</p>`;
     }
 };
 
