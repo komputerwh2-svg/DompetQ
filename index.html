@@ -1874,34 +1874,69 @@
 
 
         // =================================================================
-        // FUNGSIONALITAS: SNAPSHOT AUTOMATIC CUT-OFF SALDO BULAN LALU (BACKEND-LESS)
+        // FUNGSIONALITAS: SNAPSHOT AUTOMATIC CUT-OFF SALDO BULAN LALU
         // =================================================================
-        window.periksaDanAmankanSaldoBulanLalu = async function(userToken, formatPeriodeLaluClean, sisaUangRiilBulanLalu) {
-            const projectId = window.firebaseConfig?.projectId || "dompetq-app";
+        window.periksaDanAmankanSaldoBulanLalu = async function(userToken, projectId, formatPeriodeLaluClean) {
             const docIdSaldoLalu = `saldo_lalu_${formatPeriodeLaluClean}`;
-            const urlTarget = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial/${docIdSaldoLalu}`;
+            const urlTargetLalu = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial/${docIdSaldoLalu}`;
 
             try {
-                // 1. Periksa ketersediaan snapshot dokumen bulan lalu
-                const cekRespon = await fetch(urlTarget, {
+                // 1. Cek dulu apakah dokumen saldo_lalu_[bulan_lalu] sudah pernah dibuat
+                const cekRespon = await fetch(urlTargetLalu, {
                     method: 'GET',
                     headers: { 'Authorization': `Bearer ${userToken}` }
                 });
 
-                // 2. Jika statusnya 404 (Belum ada), buat otomatis datanya
+                // 2. Jika statusnya 404 (Belum Ada), mari kita hitung mundur data riil bulan lalu!
                 if (cekRespon.status === 404) {
-                    console.log(`📝 Mendeteksi pergantian bulan baru! Menulis snapshot saldo sisa untuk: ${docIdSaldoLalu}`);
+                    console.log(`⚠️ Snapshot ${docIdSaldoLalu} belum ada. Memulai kalkulasi mundur pembukuan bulan lalu...`);
                     
+                    const daftarKategori = ["gaji", "ksp", "thr"];
+                    let akumulasiPemasukanLalu = 0;
+                    let akumulasiPengeluaranLalu = 0; // Default 0, atau sesuaikan jika ada pengeluaran bulan lalu
+
+                    // Fetch paralel data kategori bulan lalu (misal: *_juni_2026)
+                    const requestLaluPromises = daftarKategori.map(async (kat) => {
+                        const docIdLalu = `${kat}_${formatPeriodeLaluClean}`;
+                        const urlHitung = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial/${docIdLalu}`;
+                        
+                        try {
+                            const res = await fetch(urlHitung, {
+                                method: 'GET',
+                                headers: { 'Authorization': `Bearer ${userToken}` }
+                            });
+                            if (res.ok) {
+                                const json = await res.json();
+                                const fields = json.fields || {};
+                                return parseInt(fields.totalBersihNetto?.integerValue || fields.totalBersihNetto?.stringValue || 0);
+                            }
+                        } catch (e) {
+                            console.error(`Gagal hitung mundur kategori ${kat} untuk bulan lalu:`, e);
+                        }
+                        return 0;
+                    });
+
+                    const hasilLalu = await Promise.allSettled(requestLaluPromises);
+                    hasilLalu.forEach(h => {
+                        if (h.status === 'fulfilled') akumulasiPemasukanLalu += h.value;
+                    });
+
+                    // Hitung sisa bersih bulan lalu yang sebenarnya
+                    const sisaSaldoMurniLalu = akumulasiPemasukanLalu - akumulasiPengeluaranLalu;
+
+                    console.log(`📝 Menyimpan sisa saldo cut-off murni bulan lalu (Rp ${sisaSaldoMurniLalu}) ke database...`);
+
+                    // 3. Simpan permanen ke Firestore sebagai saldo awal bulan ini
                     const payloadData = {
                         fields: {
-                            totalBersihNetto: { integerValue: sisaUangRiilBulanLalu.toString() },
-                            keterangan: { stringValue: `Amankan sisa saldo otomatis dari periode ${formatPeriodeLaluClean}` },
+                            totalBersihNetto: { integerValue: sisaSaldoMurniLalu.toString() },
+                            keterangan: { stringValue: `Amankan sisa saldo otomatis dari penutupan periode ${formatPeriodeLaluClean}` },
                             diperbaruiPada: { stringValue: new Date().toISOString() }
                         }
                     };
 
-                    const buatRespon = await fetch(urlTarget, {
-                        method: 'PATCH',
+                    const buatRespon = await fetch(urlTargetLalu, {
+                        method: 'PATCH', // Menggunakan PATCH untuk auto-create document
                         headers: {
                             'Authorization': `Bearer ${userToken}`,
                             'Content-Type': 'application/json'
@@ -1910,14 +1945,19 @@
                     });
 
                     if (buatRespon.ok) {
-                        console.log(`✅ BERHASIL MENGUNCI SALDO LALU: Rp ${sisaUangRiilBulanLalu.toLocaleString('id-ID')} disimpan ke ${docIdSaldoLalu}`);
+                        console.log(`✅ BERHASIL CUT-OFF BULANAN! Rp ${sisaSaldoMurniLalu.toLocaleString('id-ID')} terkunci di dokumen: ${docIdSaldoLalu}`);
+                        return sisaSaldoMurniLalu;
                     }
-                } else {
-                    console.log(`ℹ️ Dokumen penampung otomatis ${docIdSaldoLalu} sudah terkunci aman di database.`);
+                } else if (cekRespon.ok) {
+                    // Jika data sudah ada, langsung ambil nilainya
+                    const dataLaluJson = await cekRespon.json();
+                    const fieldsLalu = dataLaluJson.fields || {};
+                    return parseInt(fieldsLalu.totalBersihNetto?.integerValue || fieldsLalu.totalBersihNetto?.stringValue || 0);
                 }
-            } catch (error) {
-                console.error("❌ Gagal menjalankan sistem otomatisasi snapshot saldo lalu:", error);
+            } catch (err) {
+                console.error("❌ Gagal total mengeksekusi otomatisasi cut-off saldo:", err);
             }
+            return 0;
         };
 
         // =================================================================
@@ -1935,26 +1975,29 @@
                 // 1. Ambil token otentikasi aktif user Google
                 const userToken = await window.auth.currentUser.getIdToken();
 
-                // 2. Hitung nama dokumen berdasarkan BULAN SEKARANG
+                // 2. Hitung nama dokumen berdasarkan BULAN SEKARANG (Juli 2026)
                 const opsiWaktu = { month: 'long', year: 'numeric' };
                 let periodeBulanSekarang = new Date().toLocaleDateString('id-ID', opsiWaktu); 
-                periodeBulanSekarang = periodeBulanSekarang.replace(/\b\w/g, c => c.toUpperCase()); // Contoh: "Juli 2026"
-                const formatPeriodeClean = periodeBulanSekarang.trim().toLowerCase().replace(/\s+/g, '_'); // Contoh: "juli_2026"
+                periodeBulanSekarang = periodeBulanSekarang.replace(/\b\w/g, c => c.toUpperCase()); 
+                const formatPeriodeClean = periodeBulanSekarang.trim().toLowerCase().replace(/\s+/g, '_');
 
-                // 3. Hitung penamaan dokumen berdasarkan BULAN LALU
+                // 3. Hitung penamaan dokumen mundur berdasarkan BULAN LALU (Juni 2026)
                 const tanggalSatuBulanLalu = new Date();
                 tanggalSatuBulanLalu.setMonth(tanggalSatuBulanLalu.getMonth() - 1);
                 let periodeBulanLalu = tanggalSatuBulanLalu.toLocaleDateString('id-ID', opsiWaktu);
-                const formatPeriodeLaluClean = periodeBulanLalu.trim().toLowerCase().replace(/\s+/g, '_'); // Contoh: "juni_2026"
+                const formatPeriodeLaluClean = periodeBulanLalu.trim().toLowerCase().replace(/\s+/g, '_'); // Hasil: "juni_2026"
 
                 const projectId = window.firebaseConfig?.projectId || "dompetq-app";
                 const daftarKategori = ["gaji", "ksp", "thr"];
                 
                 let totalPemasukan = 0;
-                let totalPengeluaran = 0; // Set standar 0 terlebih dahulu atau integrasikan variabel pengeluaran riil Anda
+                let totalPengeluaran = 0; 
                 let totalSaldoBulanLalu = 0;
 
-                // 4. Lakukan fetch paralel ke kategori Bulan Sekarang
+                // 🚀 CRITICAL STEP: Panggil fungsi pembukuan otomatis saldo bulan lalu terlebih dahulu
+                totalSaldoBulanLalu = await window.periksaDanAmankanSaldoBulanLalu(userToken, projectId, formatPeriodeLaluClean);
+
+                // 4. Lakukan fetch paralel data kategori untuk Bulan Baru (Juli 2026)
                 const requestPromises = daftarKategori.map(async (kat) => {
                     const docId = `${kat}_${formatPeriodeClean}`;
                     const endpointUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial/${docId}`;
@@ -1980,31 +2023,6 @@
                     return 0;
                 });
 
-                // 5. Tambahkan fetch paralel khusus mengambil sisa Saldo Bulan Lalu
-                const docIdSaldoLalu = `saldo_lalu_${formatPeriodeLaluClean}`;
-                const urlSaldoLalu = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial/${docIdSaldoLalu}`;
-                
-                const fetchSaldoLaluPromise = (async () => {
-                    try {
-                        const responLalu = await fetch(urlSaldoLalu, {
-                            method: 'GET',
-                            headers: {
-                                'Authorization': `Bearer ${userToken}`,
-                                'Content-Type': 'application/json'
-                            }
-                        });
-                        if (responLalu.ok) {
-                            const docJsonLalu = await responLalu.json();
-                            const fieldsLalu = docJsonLalu.fields || {};
-                            return parseInt(fieldsLalu.totalBersihNetto?.integerValue || fieldsLalu.totalBersihNetto?.stringValue || fieldsLalu.nominal?.integerValue || 0);
-                        }
-                    } catch (errLalu) {
-                        console.warn("Dokumen sisa saldo bulan lalu belum dibuat / tidak ditemukan.");
-                    }
-                    return 0;
-                })();
-
-                // Tunggu penyelesaian data rekap kategori bulan ini
                 const hasilKalkulasi = await Promise.allSettled(requestPromises);
                 hasilKalkulasi.forEach(hasil => {
                     if (hasil.status === 'fulfilled') {
@@ -2012,26 +2030,11 @@
                     }
                 });
 
-                // Ambil nilai dari database untuk saldo bulan lalu
-                totalSaldoBulanLalu = await fetchSaldoLaluPromise;
-
-                // 🚀 [OTOMATISASI CUT-OFF]: Jika database mengembalikan 0 (berarti belum ada data penampung bulan lalu)
-                // Jalankan pencatatan otomatis agar sisa keuangan bulan lalu dibukukan sebagai saldo awal
-                if (totalSaldoBulanLalu === 0) {
-                    // Rumus estimasi sisa uang riil bulan lalu (Sesuaikan jika Anda punya variabel kalkulasi pengeluaran bulan lalu)
-                    const sisaUangRiilBulanLalu = totalPemasukan - totalPengeluaran; 
-                    
-                    if (sisaUangRiilBulanLalu > 0) {
-                        totalSaldoBulanLalu = sisaUangRiilBulanLalu;
-                        await window.periksaDanAmankanSaldoBulanLalu(userToken, formatPeriodeLaluClean, totalSaldoBulanLalu);
-                    }
-                }
-
-                // 6. RUMUS UTAMA SALDO SAAT INI (Pemasukan Bulan Ini + Sisa Bulan Lalu - Pengeluaran)
+                // 5. RUMUS UTAMA SALDO SAAT INI (Kombinasi Sisa Bulan Lalu + Pemasukan Bulan Baru)
                 const sisaSaldoTersedia = (totalPemasukan + totalSaldoBulanLalu) - totalPengeluaran;
 
                 // =================================================================
-                // INJEKSI TARGET ID BARU: DISET SESUAI STRUKTUR FLAT HTML DOMPETQ
+                // INJEKSI TARGET ID: DISET SESUAI STRUKTUR FLAT HTML DOMPETQ
                 // =================================================================
                 
                 // Target 1: Teks Judul Atas (id="label-rekap-bulan")
@@ -2044,7 +2047,7 @@
                 const elSaldo = document.getElementById('txt-saldo-utama'); 
                 if (elSaldo) elSaldo.innerText = `Rp ${sisaSaldoTersedia.toLocaleString('id-ID')}`;
 
-                // Target 3: Sisa Bulan Lalu (id="txt-saldo-lalu")
+                // Target 3: Sisa Bulan Lalu yang Diambil dari Penampung (id="txt-saldo-lalu")
                 const elSaldoLalu = document.getElementById('txt-saldo-lalu');
                 if (elSaldoLalu) elSaldoLalu.innerText = `Rp ${totalSaldoBulanLalu.toLocaleString('id-ID')}`;
 
@@ -2057,16 +2060,15 @@
                 if (elPengeluaran) elPengeluaran.innerText = `-Rp ${totalPengeluaran.toLocaleString('id-ID')}`;
 
                 // =================================================================
-                // FIX CRITICAL: SEMBUNYIKAN OVERLAY PENGUNCI DATA SECARA TEGAS
+                // FIX CRITICAL: SEMBUNYIKAN OVERLAY PENGUNCI DATA
                 // =================================================================
                 const overlaySaldo = document.getElementById('auth-lock-overlay');
                 if (overlaySaldo) {
                     overlaySaldo.classList.add('hidden');
                     overlaySaldo.style.display = 'none';
-                    console.log("🔓 PENGUNCI SALDO BERHASIL DIBUKA: Menyembunyikan overlay lock.");
                 }
 
-                console.log(`🚀 SINKRONISASI SUKSES! Periode: ${periodeBulanSekarang} | Saldo Utama: Rp ${sisaSaldoTersedia.toLocaleString('id-ID')} | Sisa Lalu: Rp ${totalSaldoBulanLalu.toLocaleString('id-ID')}`);
+                console.log(`🚀 SINKRONISASI BULAN BARU SUKSES! Periode: ${periodeBulanSekarang} | Saldo Utama: Rp ${sisaSaldoTersedia.toLocaleString('id-ID')} | Sisa Juni: Rp ${totalSaldoBulanLalu.toLocaleString('id-ID')}`);
                 
                 window.currentDeveloperUid = uid;
 
