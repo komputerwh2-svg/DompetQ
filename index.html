@@ -553,6 +553,100 @@
             </div>
         </div>
 
+        <div id="modal-pilihan-transaksi" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center hidden p-4">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-sm w-full mx-4 overflow-hidden transform transition-all duration-300">
+                <div class="bg-gradient-to-r from-slate-800 to-slate-900 px-5 py-4 flex justify-between items-center text-white">
+                    <div>
+                        <h3 class="font-bold text-sm tracking-wide">Pilih Jenis Catatan</h3>
+                        <p class="text-[10px] text-slate-400">Tentukan tipe transaksi yang ingin dibukukan</p>
+                    </div>
+                    <button onclick="window.tutupPilihanTransaksi()" class="text-gray-400 hover:text-white text-lg p-1">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+                
+                <div class="p-5 bg-slate-50 space-y-3">
+                    <button onclick="window.pilihTransaksiMasuk()" class="w-full flex items-center gap-4 bg-white p-3.5 rounded-xl border border-gray-200 hover:border-blue-500 hover:bg-blue-50/30 transition text-left shadow-xs group">
+                        <div class="w-10 h-10 rounded-lg bg-green-100 flex items-center justify-center text-green-600 font-bold text-lg shrink-0 group-hover:scale-105 transition">
+                            <i class="fas fa-file-invoice-dollar"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-bold text-xs text-gray-800">Transaksi Masuk (Pemasukan)</h4>
+                            <p class="text-[10px] text-gray-400 mt-0.5">Scan otomatis Slip Gaji, THR, KSP</p>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-300 group-hover:text-blue-500 text-xs transition"></i>
+                    </button>
+
+                    <button onclick="window.pilihTransaksiKeluar()" class="w-full flex items-center gap-4 bg-white p-3.5 rounded-xl border border-gray-200 hover:border-red-500 hover:bg-red-50/30 transition text-left shadow-xs group">
+                        <div class="w-10 h-10 rounded-lg bg-red-100 flex items-center justify-center text-red-600 font-bold text-lg shrink-0 group-hover:scale-105 transition">
+                            <i class="fas fa-wallet"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-bold text-xs text-gray-800">Transaksi Keluar (Pengeluaran)</h4>
+                            <p class="text-[10px] text-gray-400 mt-0.5">Catat manual pengeluaran rutin, belanja, tagihan, dll</p>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-300 group-hover:text-red-500 text-xs transition"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-pengeluaran-baru" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center md:items-center hidden p-4 overflow-y-auto">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transform transition-all duration-300 flex flex-col max-h-[calc(100vh-6rem)] md:max-h-[85vh] my-auto">
+                <div class="bg-gradient-to-r from-red-700 to-red-800 px-5 py-3.5 flex justify-between items-center text-white shrink-0">
+                    <div>
+                        <h3 class="font-bold text-base tracking-wide">Catat Pengeluaran Baru</h3>
+                        <p class="text-[10px] text-red-200">Kurangi saldo utama untuk pos keuangan tertentu</p>
+                    </div>
+                    <button onclick="window.tutupModalPengeluaran()" class="text-red-200 hover:text-white text-xl p-1">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="p-5 bg-slate-50 space-y-4 overflow-y-auto flex-1">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1.5">
+                            <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Kategori Pos:</label>
+                            <select id="out-kategori" class="w-full px-2.5 py-2 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-red-500 cursor-pointer shadow-sm">
+                                <option value="belanja">Belanja Bulanan</option>
+                                <option value="tagihan">Tagihan & Listrik</option>
+                                <option value="konsumsi">Makanan & Minuman</option>
+                                <option value="transportasi">Bensin & Transport</option>
+                                <option value="hiburan">Hiburan & Self Reward</option>
+                                <option value="lainnya">Kebutuhan Lainnya</option>
+                            </select>
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Periode Buku:</label>
+                            <input type="month" id="out-periode" class="w-full px-2.5 py-2 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-red-500 cursor-pointer shadow-sm">
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Keterangan / Keperluan:</label>
+                        <input type="text" id="out-keterangan" placeholder="Contoh: Bayar Wi-Fi, Beli beras" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-red-500 shadow-sm">
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider text-red-600">Nominal Pengeluaran (Rp):</label>
+                        <div class="relative flex items-center">
+                            <span class="absolute left-3.5 text-xs font-bold text-gray-400">Rp</span>
+                            <input type="number" id="out-nominal" placeholder="0" class="w-full pl-9 pr-4 py-2.5 bg-white border border-red-300 rounded-xl text-sm font-black text-red-700 outline-none focus:ring-2 focus:ring-red-500 shadow-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-100 px-5 py-3 flex justify-between items-center border-t border-gray-200 shrink-0">
+                    <button onclick="window.tutupModalPengeluaran()" class="px-4 py-1.5 bg-gray-300 text-gray-700 font-medium rounded-xl text-xs hover:bg-gray-400 transition shadow-sm">
+                        Batal
+                    </button>
+                    <button onclick="window.simpanPengeluaranManual()" class="px-5 py-1.5 bg-red-600 text-white font-bold rounded-xl text-xs hover:bg-red-700 transition shadow-sm flex items-center gap-1.5">
+                        <i class="fas fa-save"></i> Simpan Pengeluaran
+                    </button>
+                </div>
+            </div>
+        </div>
+
         <div id="modal-ocr" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 hidden backdrop-blur-xs">
             <div class="bg-white rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl transition-all flex flex-col max-h-[82vh]">
                 
@@ -1155,19 +1249,6 @@
             return angka < 0 ? `-${format}` : format;
         }
 
-        // 1. ATUR LABEL BULAN BERJALAN SECARA DINAMIS
-        function inisialisasiLabelWaktu() {
-            const listBulan = ["Januari", "Februari", "Maret", "April", "Mei", "Juni", "Juli", "Agustus", "September", "Oktober", "November", "Desember"];
-            const waktuSekarang = new Date();
-            const namaBulan = listBulan[waktuSekarang.getMonth()];
-            const tahun = waktuSekarang.getFullYear(); // Mendapatkan tahun berjalan saat ini (2026)
-            
-            const elemenLabel = document.getElementById('label-rekap-bulan');
-            if (elemenLabel) {
-                elemenLabel.innerText = `Rekap Saldo ${namaBulan} ${tahun}`;
-            }
-        }
-
         // Variabel status global untuk memantau status login
         let userSudahLogin = false;
 
@@ -1196,7 +1277,24 @@
         // Interseptor khusus untuk tombol Upload Slip di Akses Cepat
         function proteksiAksesUpload() {
             if (userSudahLogin) {
-                if (typeof handleSmartAction === 'function') handleSmartAction();
+                // ✨ BYPASS LANGSUNG KE MODAL OCR TANPA LEWAT GERBANG PILIHAN
+                const modalOcr = document.getElementById("modal-ocr");
+                if (modalOcr) {
+                    modalOcr.classList.remove("hidden");
+                    
+                    // Pastikan alur langkah (step) OCR kembali ke tampilan awal (halaman input)
+                    const stepInput = document.getElementById("step-input");
+                    const stepLoading = document.getElementById("step-loading");
+                    const stepKonfirmasi = document.getElementById("step-konfirmasi");
+                    
+                    if (stepInput) stepInput.classList.remove("hidden");
+                    if (stepLoading) stepLoading.classList.add("hidden");
+                    if (stepKonfirmasi) stepKonfirmasi.classList.add("hidden");
+                    
+                    console.log("[Akses Cepat] Berhasil bypass langsung ke Modal OCR.");
+                } else {
+                    tampilAlert("Komponen modal-ocr tidak ditemukan di HTML.", "error");
+                }
             } else {
                 // Memanggil fungsi modal alert kustom Anda
                 tampilAlert("Akses Terbatas! Silakan login untuk mengunggah berkas slip nota.", "warning");
@@ -1529,12 +1627,19 @@
             // Jalankan modal sesuai konteks tab
             switch (currentTab) {
                 case 'rekap':
-                    const modalOcr = document.getElementById("modal-ocr");
-                    if (modalOcr) {
-                        modalOcr.classList.remove("hidden");
-                        document.getElementById("step-input").classList.remove("hidden");
-                        document.getElementById("step-loading").classList.add("hidden");
-                        document.getElementById("step-konfirmasi").classList.add("hidden");
+                    // ✨ GERBANG BARU: Mengalihkan aksi langsung ke Modal Pilihan Transaksi
+                    const modalPilihan = document.getElementById("modal-pilihan-transaksi");
+                    if (modalPilihan) {
+                        // Setel default bulan berjalan di input pengeluaran agar selalu siap pakai
+                        const skrg = new Date();
+                        const formatBulan = `${skrg.getFullYear()}-${String(skrg.getMonth() + 1).padStart(2, '0')}`;
+                        const targetPeriodeOut = document.getElementById('out-periode');
+                        if (targetPeriodeOut) targetPeriodeOut.value = formatBulan;
+
+                        // Tampilkan modal pilihan
+                        modalPilihan.classList.remove("hidden");
+                    } else {
+                        tampilAlert("Struktur modal pilihan transaksi tidak ditemukan.", "error");
                     }
                     break;
                     
@@ -1555,6 +1660,153 @@
                     break;
             }
         }
+
+        // Mengubah trigger tombol + agar tidak langsung buka OCR, tapi masuk gerbang pilihan
+        window.bukaModalUtama = function() {
+            // Set default periode bulan saat ini di input pengeluaran agar user tidak repot mengisi
+            const skrg = new Date();
+            const formatBulan = `${skrg.getFullYear()}-${String(skrg.getMonth() + 1).padStart(2, '0')}`;
+            const targetPeriode = document.getElementById('out-periode');
+            if (targetPeriode) targetPeriode.value = formatBulan;
+
+            // Tampilkan modal pilihan
+            document.getElementById('modal-pilihan-transaksi').classList.remove('hidden');
+        };
+
+        // Fungsi Kontrol Modal Pilihan
+        window.tutupPilihanTransaksi = function() {
+            document.getElementById('modal-pilihan-transaksi').classList.add('hidden');
+        };
+
+        window.pilihTransaksiMasuk = function() {
+            // 1. Tutup dulu modal pilihan transaksi agar tidak tumpang tindih
+            window.tutupPilihanTransaksi();
+            
+            // 2. Buka modal OCR lama Anda menggunakan logika aslinya secara presisi
+            const modalOcr = document.getElementById("modal-ocr");
+            if (modalOcr) {
+                modalOcr.classList.remove("hidden");
+                
+                // Kembalikan alur langkah (step) OCR ke halaman input awal
+                const stepInput = document.getElementById("step-input");
+                const stepLoading = document.getElementById("step-loading");
+                const stepKonfirmasi = document.getElementById("step-konfirmasi");
+                
+                if (stepInput) stepInput.classList.remove("hidden");
+                if (stepLoading) stepLoading.classList.add("hidden");
+                if (stepKonfirmasi) stepKonfirmasi.classList.add("hidden");
+                
+                console.log("Sukses mengalihkan gerbang ke Modal OCR asli.");
+            } else {
+                tampilAlert("Sistem mendeteksi komponen modal-ocr tidak terpasang di HTML.", "error");
+            }
+        };
+
+        window.pilihTransaksiKeluar = function() {
+            window.tutupPilihanTransaksi();
+            // Tampilkan modal pengeluaran baru
+            document.getElementById('modal-pengeluaran-baru').classList.remove('hidden');
+        };
+
+        window.tutupModalPengeluaran = function() {
+            document.getElementById('modal-pengeluaran-baru').classList.add('hidden');
+            // Reset form
+            document.getElementById('out-keterangan').value = "";
+            document.getElementById('out-nominal').value = "";
+        };
+
+
+        window.simpanPengeluaranManual = async function() {
+            const kategori = document.getElementById('out-kategori').value;
+            const keterangan = document.getElementById('out-keterangan').value.trim();
+            const nominal = parseInt(document.getElementById('out-nominal').value) || 0;
+            const inputPeriode = document.getElementById('out-periode').value;
+
+            if (nominal <= 0 || !keterangan) {
+                tampilAlert("Gagal menyimpan! Harap isi keterangan dan nominal pengeluaran dengan benar.", "warning");
+                return;
+            }
+
+            if (!window.auth || !window.auth.currentUser) {
+                tampilAlert("Sesi login kedaluwarsa. Silakan login ulang dengan Google.", "error");
+                return;
+            }
+
+            const userAktif = window.auth.currentUser;
+            let namaUserSistem = "user_dompetq";
+            if (userAktif.email && userAktif.email.includes("@")) {
+                namaUserSistem = userAktif.email.split('@')[0];
+            }
+
+            // Parsing Periode Kalender
+            let periodeTeks = "Juni 2026";
+            let formatPeriodeClean = "juni_2026";
+            if (inputPeriode) {
+                const [tahun, bulan] = inputPeriode.split('-');
+                const namaBulanIndo = [
+                    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+                ];
+                const indexBulan = parseInt(bulan, 10) - 1;
+                if (indexBulan >= 0 && indexBulan <= 11) {
+                    periodeTeks = `${namaBulanIndo[indexBulan]} ${tahun}`;
+                    formatPeriodeClean = `${namaBulanIndo[indexBulan].toLowerCase()}_${tahun}`;
+                }
+            }
+
+            try {
+                tampilAlert("Mengamankan jalur data Firebase...", "info");
+                const userToken = await userAktif.getIdToken(true);
+
+                // Kunci ID Unik Pengeluaran di Firestore: out_kategori_bulan_tahun (Contoh: out_belanja_februari_2026)
+                const keyTransaksi = `out_${kategori}_${formatPeriodeClean}`;
+                const projectId = window.firebaseConfig?.projectId || "dompetq-app";
+
+                const endpointFirestore = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial/${keyTransaksi}`;
+
+                const payloadFirestore = {
+                    fields: {
+                        kategori: { stringValue: kategori },
+                        keterangan: { stringValue: keterangan },
+                        periode: { stringValue: periodeTeks },
+                        pendapatan: { integerValue: "0" }, // Pengeluaran tidak menambah pendapatan gross
+                        potongan: { integerValue: nominal.toString() }, // Nominal masuk ke kolom potongan/beban pengeluaran
+                        totalBersihNetto: { integerValue: `-${nominal}` }, // Minus karena mengurangi saldo
+                        referenceKeyImage: { stringValue: "MANUAL_INPUT" },
+                        waktuTransaksi: { timestampValue: new Date().toISOString() },
+                        namaUser: { stringValue: namaUserSistem }
+                    }
+                };
+
+                const responFirestore = await fetch(endpointFirestore, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`
+                    },
+                    body: JSON.stringify(payloadFirestore)
+                });
+
+                if (!responFirestore.ok) {
+                    const errTxt = await responFirestore.text();
+                    throw new Error(`Gagal Menyimpan ke Firestore: ${errTxt}`);
+                }
+
+                tampilAlert(`Sukses! Pengeluaran untuk ${keterangan} berhasil dicatat.`, "success");
+                window.tutupModalPengeluaran();
+
+                // Memicu sinkronisasi penghitungan ulang angka dashboard agar pengeluaran langsung memotong saldo
+                if (typeof window.inisialisasiAplikasi === 'function') {
+                    await window.inisialisasiAplikasi();
+                } else if (typeof window.muatDataDashboard === 'function') {
+                    await window.muatDataDashboard();
+                }
+
+            } catch (error) {
+                console.error("Error Simpan Pengeluaran:", error);
+                tampilAlert(`Gagal Sinkronisasi: ${error.message}`, "error");
+            }
+        };
 
         // =================================================================
         // JEMBATAN SINKRONISASI (AGAR HTML LAMA TIDAK ERROR)
