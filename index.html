@@ -359,7 +359,7 @@
                 <div class="bg-gradient-to-r from-blue-700 to-indigo-800 px-5 py-4 flex justify-between items-center text-white">
                     <div class="flex items-center gap-3">
                         <i class="fas fa-archive text-xl text-blue-200"></i>
-                        <h3 class="font-bold text-lg tracking-wide">Arsip Saldo Bulanan</h3>
+                        <h3 class="font-bold text-lg tracking-wide">Arsip Dompet Bulanan</h3>
                     </div>
                     <button onclick="window.tutupModalArsip()" class="text-white hover:text-gray-200 focus:outline-none text-xl p-1">
                         <i class="fas fa-times"></i>
@@ -386,7 +386,7 @@
         <!-- ================================================================= -->
         <!-- MODAL: RINCIAN DETAIL ARSIP TRANSAKSI MASA LALU                   -->
         <!-- ================================================================= -->
-        <div id="modal-detail-arsip-transaksi" class="fixed inset-0 bg-gray-950 bg-opacity-80 flex items-center justify-center z-50 hidden">
+        <div id="modal-detail-arsip-transaksi" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center hidden p-4">
             <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transform transition-all duration-300">
                 <!-- Header -->
                 <div class="bg-gradient-to-r from-slate-800 to-slate-900 px-5 py-4 flex justify-between items-center text-white">
@@ -403,7 +403,7 @@
                 <div class="p-5 max-h-[75vh] overflow-y-auto bg-slate-50">
                     <!-- Ringkasan Pendapatan Bersih Bulan Terpilih -->
                     <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-4 text-center">
-                        <span class="text-xs text-gray-400 font-medium uppercase tracking-wider block">Total Kantong Masuk Clean</span>
+                        <span class="text-xs text-gray-400 font-medium uppercase tracking-wider block">Total Kantong Masuk Bersih</span>
                         <span class="text-2xl font-black text-blue-700 block mt-1" id="total-bersih-arsip">Rp 0</span>
                     </div>
 
@@ -2270,7 +2270,7 @@
             // Format judul teks (Contoh: "juni_2026" -> "Arsip Periode Juni 2026")
             const part = formatPeriodeClean.split('_');
             const namaBulan = part[0].charAt(0).toUpperCase() + part[0].slice(1) + ' ' + (part[1] || '');
-            if (txtJudulArsip) txtJudulArsip.innerText = `Arsip Periode ${namaBulan}`;
+            if (txtJudulArsip) txtJudulArsip.innerText = `Arsip Dompet Bulan ${namaBulan}`;
 
             // Tampilkan Loader di dalam modal rincian
             if (kontainerItem) {
@@ -2318,11 +2318,13 @@
                         adaData = true;
                         const f = item.fields;
                         
-                        // Ambil variabel dari database safetly sesuai struktur gambar arsip Anda
+                        // Ambil variabel dari database safely sesuai struktur gambar arsip Anda
                         const pendapatan = parseInt(f.pendapatan?.integerValue || f.pendapatan?.stringValue || 0);
                         const potongan = parseInt(f.potongan?.integerValue || f.potongan?.stringValue || 0);
                         const totalNetto = parseInt(f.totalBersihNetto?.integerValue || f.totalBersihNetto?.stringValue || 0);
-                        const urlGambarSlip = f.urlBuktiTransfer?.stringValue || f.urlImage?.stringValue || '';
+                        
+                        // FIX CRITICAL: Ambil rujukan gambar menggunakan key "referenceKeyImage" sesuai Firestore Anda
+                        const referenceKeyImage = f.referenceKeyImage?.stringValue || '';
 
                         akumulasiTotalBersih += totalNetto;
 
@@ -2339,7 +2341,7 @@
                                             <i class="fas ${item.kat === 'thr' ? 'fa-gift' : item.kat === 'ksp' ? 'fa-hand-holding-usd' : 'fa-money-check-alt'} text-sm"></i>
                                         </div>
                                         <div>
-                                            <h5 class="font-bold text-gray-800 text-xs uppercase tracking-wide">Kategori ${item.kat}</h5>
+                                            <h5 class="font-bold text-gray-800 text-xs uppercase tracking-wide">Kategori: ${item.kat}</h5>
                                             <p class="text-[10px] text-gray-400">User: ${f.namaUser?.stringValue || 'iwashia'}</p>
                                         </div>
                                     </div>
@@ -2349,20 +2351,20 @@
                                 <div class="grid grid-cols-2 gap-y-1 text-xs text-gray-500 mb-2">
                                     <div>Pendapatan Kotor:</div>
                                     <div class="text-right font-medium text-gray-700">Rp ${pendapatan.toLocaleString('id-ID')}</div>
-                                    <div>Potongan/Pinalti:</div>
+                                    <div>Potongan:</div>
                                     <div class="text-right font-medium text-red-600">-Rp ${potongan.toLocaleString('id-ID')}</div>
-                                    <div class="font-bold text-gray-800">Bersih Netto:</div>
+                                    <div class="font-bold text-gray-800">Bersih (Netto):</div>
                                     <div class="text-right font-bold text-emerald-600">Rp ${totalNetto.toLocaleString('id-ID')}</div>
                                 </div>
                                 
-                                ${urlGambarSlip ? `
-                                    <button onclick="window.pratinjauGambarArsip('${urlGambarSlip}', 'Slip ${item.kat.toUpperCase()} - ${namaBulan}')" 
-                                            class="w-full mt-2 py-1.5 bg-slate-100 text-slate-700 text-[11px] font-bold rounded-lg hover:bg-blue-600 hover:text-white transition flex items-center justify-center gap-1.5">
-                                        <i class="fas fa-image"></i> Lihat Pratinjau Slip Resmi
+                                ${referenceKeyImage ? `
+                                    <button onclick="window.bukaPratinjauSlipManual('${referenceKeyImage}')" 
+                                            class="w-full mt-2 py-1.5 bg-white border border-gray-200 hover:bg-gray-50 text-gray-700 rounded-lg font-semibold transition flex items-center justify-center gap-1.5 text-[10px] shadow-2xs">
+                                        <i class="fas fa-image text-blue-500"></i> Lihat Pratinjau Slip
                                     </button>
                                 ` : `
                                     <div class="w-full mt-2 py-1 text-center text-gray-400 text-[10px] bg-gray-50 rounded-lg border border-dashed">
-                                        <i class="fas fa-info-circle"></i> Slip lampiran tidak diunggah
+                                        <i class="fas fa-info-circle"></i> Lampiran slip tidak tersedia untuk arsip ini.
                                     </div>
                                 `}
                             </div>`;
