@@ -275,35 +275,11 @@
     
                     <div class="flex justify-between items-center mb-3">
                         <h3 class="text-xs font-bold text-gray-400 uppercase tracking-wider">Riwayat Transaksi</h3>
-                        <span class="text-xs text-blue-600 font-bold cursor-pointer hover:underline hover:text-blue-700 transition">Lihat Semua</span>
+                        <span onclick="if(typeof openArsipModal === 'function') openArsipModal()" class="text-xs text-blue-600 font-bold cursor-pointer hover:underline hover:text-blue-700 transition">Lihat Semua</span>
                     </div>
                     
-                    <div class="divide-y divide-gray-100">
-                        <div class="flex items-center justify-between py-3.5 hover:bg-gray-50/50 px-2 -mx-2 rounded-xl transition">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-9 h-9 rounded-full bg-emerald-50 text-emerald-600 flex items-center justify-center text-sm shadow-xs">
-                                    <i class="fas fa-arrow-down"></i>
-                                </div>
-                                <div>
-                                    <p class="font-bold text-xs text-gray-900">Gaji Bulanan</p>
-                                    <p class="text-[10px] text-gray-400">29 Jun 2026 • Mandiri Slip</p>
-                                </div>
-                            </div>
-                            <span class="text-emerald-600 font-black text-xs">+Rp 5.500.000</span>
-                        </div>
-                        
-                        <div class="flex items-center justify-between py-3.5 hover:bg-gray-50/50 px-2 -mx-2 rounded-xl transition">
-                            <div class="flex items-center space-x-3">
-                                <div class="w-9 h-9 rounded-full bg-rose-50 text-rose-600 flex items-center justify-center text-sm shadow-xs">
-                                    <i class="fas fa-arrow-up"></i>
-                                </div>
-                                <div>
-                                    <p class="font-bold text-xs text-gray-900">Belanja Bulanan</p>
-                                    <p class="text-[10px] text-gray-400">28 Jun 2026 • Supermarket</p>
-                                </div>
-                            </div>
-                            <span class="text-gray-900 font-black text-xs">-Rp 1.200.000</span>
-                        </div>
+                    <div id="container-riwayat-transaksi" class="divide-y divide-gray-100">
+                        <div class="text-center py-6 text-[11px] text-gray-400 font-medium">Memuat riwayat transaksi...</div>
                     </div>
 
                     <div id="tx-lock-overlay" class="absolute inset-0 bg-white/95 backdrop-blur-xs flex flex-col items-center justify-center text-center p-4 transition-all duration-300">
@@ -2535,9 +2511,6 @@
             return 0;
         };
 
-        // =================================================================
-        // 2. AMBIL DATA REALTIME DARI FIRESTORE & KALKULASI DINAMIS (FIX REALTIME)
-        // =================================================================
         window.muatRekapFinansialDashboard = async function(uid) {
             if (!window.auth || !window.auth.currentUser) {
                 console.error("❌ User belum terotentikasi Google. Gagal memuat data dashboard.");
@@ -2545,32 +2518,29 @@
             }
 
             try {
-                console.log("Mengambil seluruh rekap finansial bulan berjalan untuk kalkulasi Dashboard...");
-                
-                // 1. Ambil token otentikasi aktif user Google
+                console.log("Mengambil seluruh rekap finansial bulan berjalan untuk kalkulasi Dashboard & Riwayat...");
                 const userToken = await window.auth.currentUser.getIdToken();
 
-                // 2. Hitung nama bulan berjalan (Contoh: "Juli 2026")
                 const opsiWaktu = { month: 'long', year: 'numeric' };
                 let periodeBulanSekarang = new Date().toLocaleDateString('id-ID', opsiWaktu); 
-                periodeBulanSekarang = periodeBulanSekarang.replace(/\b\w/g, c => c.toUpperCase()); // "Juli 2026"
+                periodeBulanSekarang = periodeBulanSekarang.replace(/\b\w/g, c => c.toUpperCase()); 
 
-                // 3. Hitung penamaan dokumen mundur berdasarkan BULAN LALU (Juni 2026) untuk Saldo Awal
                 const tanggalSatuBulanLalu = new Date();
                 tanggalSatuBulanLalu.setMonth(tanggalSatuBulanLalu.getMonth() - 1);
                 let periodeBulanLalu = tanggalSatuBulanLalu.toLocaleDateString('id-ID', opsiWaktu);
-                const formatPeriodeLaluClean = periodeBulanLalu.trim().toLowerCase().replace(/\s+/g, '_'); // "juni_2026"
+                const formatPeriodeLaluClean = periodeBulanLalu.trim().toLowerCase().replace(/\s+/g, '_'); 
 
                 const projectId = window.firebaseConfig?.projectId || "dompetq-app";
                 
                 let totalPemasukan = 0;
                 let totalPengeluaran = 0; 
                 let totalSaldoBulanLalu = 0;
+                
+                // Variabel penampung HTML baris riwayat transaksi
+                let htmlRiwayatSuntik = "";
 
-                // 🚀 AMANKAN SALDO BULAN LALU (Saldo Awal)
                 totalSaldoBulanLalu = await window.periksaDanAmankanSaldoBulanLalu(userToken, projectId, formatPeriodeLaluClean);
 
-                // 4. BACA SELURUH DOKUMEN DI COLLECTION 'rekap_finansial' (Bukan menebak ID lagi)
                 const endpointUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial?pageSize=100`;
                 
                 const respon = await fetch(endpointUrl, {
@@ -2585,73 +2555,127 @@
                     const dataJson = await respon.json();
                     const documents = dataJson.documents || [];
 
-                    // Loop seluruh data finansial yang ada di server Cloud Firestore
+                    // Urutkan dokumen berdasarkan waktuTransaksi desc (Terbaru di atas) jika field tersedia
+                    documents.sort((a, b) => {
+                        const timeA = new Date(a.fields?.waktuTransaksi?.timestampValue || 0);
+                        const timeB = new Date(b.fields?.waktuTransaksi?.timestampValue || 0);
+                        return timeB - timeA;
+                    });
+
+                    let counterItem = 0;
+
                     documents.forEach(doc => {
                         const fields = doc.fields || {};
                         const teksPeriodeDoc = fields.periode?.stringValue || "";
 
-                        // COCOKKAN PERIODE: Hanya hitung data yang memiliki tag periode sesuai bulan ini (misal: "Juli 2026")
                         if (teksPeriodeDoc.trim().toLowerCase() === periodeBulanSekarang.trim().toLowerCase()) {
                             
                             const pendapatan = parseInt(fields.pendapatan?.integerValue || fields.pendapatan?.stringValue || 0);
                             const potongan = parseInt(fields.potongan?.integerValue || fields.potongan?.stringValue || 0);
-                            const kategori = fields.kategori?.stringValue || "";
+                            const kategori = (fields.kategori?.stringValue || "Umum").toUpperCase();
+                            const keterangan = fields.keterangan?.stringValue || "Transaksi Tanpa Memo";
+                            const namaUser = fields.namaUser?.stringValue || "system";
+                            
+                            // Format tanggal tampilan riwayat
+                            const tanggalRaw = fields.waktuTransaksi?.timestampValue;
+                            let tanggalTampil = "Bulan Ini";
+                            if (tanggalRaw) {
+                                const optTgl = { day: 'numeric', month: 'short', year: 'numeric' };
+                                tanggalTampil = new Date(tanggalRaw).toLocaleDateString('id-ID', optTgl);
+                            }
 
-                            // Kelompokkan kalkulasi berdasarkan tipe transaksinya
-                            if (kategori.startsWith("mutasi_")) {
-                                // Kasus khusus Mutasi/Transfer internal: 
-                                // Memotong kas saldo utama, tetapi tidak dihitung sebagai pengeluaran belanja (biaya hidup)
+                            // Logika Kalkulasi
+                            if (fields.kategori?.stringValue?.startsWith("mutasi_")) {
                                 totalPengeluaran += potongan; 
                             } else {
-                                // Transaksi normal umum
                                 totalPemasukan += pendapatan;
                                 totalPengeluaran += potongan;
                             }
+
+                            // ✨ RENDER BARIS RIWAYAT TRANSAKSI (Maksimal tampilkan 5 item terbaru di home)
+                            if (counterItem < 5) {
+                                let iconClass = "fa-arrow-down";
+                                let iconBg = "bg-emerald-50 text-emerald-600";
+                                let warnaNominal = "text-emerald-600 font-black text-xs";
+                                let teksNominal = `+Rp ${pendapatan.toLocaleString('id-ID')}`;
+
+                                if (potongan > 0) {
+                                    // Cek jika tipenya mutasi internal atau pengeluaran murni
+                                    const isMutasi = fields.kategori?.stringValue?.startsWith("mutasi_");
+                                    iconClass = isMutasi ? "fas fa-exchange-alt" : "fa-arrow-up";
+                                    iconBg = isMutasi ? "bg-purple-50 text-purple-600" : "bg-rose-50 text-rose-600";
+                                    warnaNominal = isMutasi ? "text-purple-600 font-black text-xs" : "text-gray-900 font-black text-xs";
+                                    teksNominal = `-Rp ${potongan.toLocaleString('id-ID')}`;
+                                }
+
+                                htmlRiwayatSuntik += `
+                                    <div class="flex items-center justify-between py-3.5 hover:bg-gray-50/50 px-2 -mx-2 rounded-xl transition">
+                                        <div class="flex items-center space-x-3">
+                                            <div class="w-9 h-9 rounded-full ${iconBg} flex items-center justify-center text-xs shadow-xs">
+                                                <i class="${iconClass}"></i>
+                                            </div>
+                                            <div>
+                                                <p class="font-bold text-xs text-gray-900">${keterangan}</p>
+                                                <p class="text-[10px] text-gray-400">${tanggalTampil} • Kategori: ${kategori} (${namaUser})</p>
+                                            </div>
+                                        </div>
+                                        <span class="${warnaNominal}">${teksNominal}</span>
+                                    </div>
+                                `;
+                                counterItem++;
+                            }
                         }
                     });
-                } else {
-                    console.warn("Gagal mendownload list data finansial, beralih ke fallback data kosong.");
+
+                    // Jika setelah diloop ternyata tidak ada transaksi sama sekali di bulan ini
+                    if (htmlRiwayatSuntik === "") {
+                        htmlRiwayatSuntik = `
+                            <div class="text-center py-8 text-gray-400">
+                                <i class="fas fa-receipt text-lg block mb-1 text-gray-300"></i>
+                                <p class="text-[11px] font-bold">Belum Ada Transaksi</p>
+                                <p class="text-[9px] text-gray-400">Silakan tambahkan pemasukan atau pengeluaran baru.</p>
+                            </div>
+                        `;
+                    }
                 }
 
-                // 5. RUMUS FINANSIAL UTAMA DOMPETQ
-                // Saldo Tersedia = (Akumulasi Pemasukan + Sisa Kas Bulan Lalu) - Seluruh Potongan/Pengeluaran
+                // Jalankan Rumus Utama
                 const sisaSaldoTersedia = (totalPemasukan + totalSaldoBulanLalu) - totalPengeluaran;
 
-                // =================================================================
-                // INJEKSI DATA KE HTML DOM (REALTIME UPDATE)
-                // =================================================================
-                
-                // Target 1: Teks Judul Banner Utama
+                // INJEKSI TARGET ID KEUANGAN
                 const elLabelBulan = document.getElementById('label-rekap-bulan');
                 if (elLabelBulan) elLabelBulan.innerText = `SALDO DOMPET BULAN ${periodeBulanSekarang.toUpperCase()}`;
 
-                // Target 2: Kas Utama yang Dapat Digunakan saat ini
                 const elSaldo = document.getElementById('txt-saldo-utama'); 
                 if (elSaldo) elSaldo.innerText = `Rp ${sisaSaldoTersedia.toLocaleString('id-ID')}`;
 
-                // Target 3: Estafet Sisa Uang dari Bulan Sebelumnya
                 const elSaldoLalu = document.getElementById('txt-saldo-lalu');
                 if (elSaldoLalu) elSaldoLalu.innerText = `Rp ${totalSaldoBulanLalu.toLocaleString('id-ID')}`;
 
-                // Target 4: Total Pendapatan Kotor bulan ini
                 const elPemasukan = document.getElementById('txt-pemasukan');
                 if (elPemasukan) elPemasukan.innerText = `Rp ${totalPemasukan.toLocaleString('id-ID')}`;
 
-                // Target 5: Total Pengeluaran (Belanja + Alokasi Tabungan/Servis)
                 const elPengeluaran = document.getElementById('txt-pengeluaran');
                 if (elPengeluaran) elPengeluaran.innerText = `Rp ${totalPengeluaran.toLocaleString('id-ID')}`;
 
-                // =================================================================
-                // SEMBUNYIKAN OVERLAY LOADING / LOCK SCREEN
-                // =================================================================
+                // ✨ INJEKSI HASIL RENDER RIWAYAT BARU
+                const elContainerRiwayat = document.getElementById('container-riwayat-transaksi');
+                if (elContainerRiwayat) elContainerRiwayat.innerHTML = htmlRiwayatSuntik;
+
+                // BUKA OVERLAY LOCK UTAMA & RIWAYAT
                 const overlaySaldo = document.getElementById('auth-lock-overlay');
                 if (overlaySaldo) {
                     overlaySaldo.classList.add('hidden');
                     overlaySaldo.style.display = 'none';
                 }
-
-                console.log(`🚀 [REALTIME SUCCESS] Periode: ${periodeBulanSekarang} | Saldo: Rp ${sisaSaldoTersedia.toLocaleString('id-ID')} | Sisa Bulan Lalu: Rp ${totalSaldoBulanLalu.toLocaleString('id-ID')}`);
                 
+                const overlayRiwayat = document.getElementById('tx-lock-overlay');
+                if (overlayRiwayat) {
+                    overlayRiwayat.classList.add('hidden');
+                    overlayRiwayat.style.display = 'none';
+                }
+
+                console.log(`🚀 [REALTIME SUCCESS] Data Dashboard & Riwayat Terpajang Sempurna!`);
                 window.currentDeveloperUid = uid;
 
             } catch (error) {
