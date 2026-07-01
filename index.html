@@ -188,9 +188,9 @@
                         <div class="absolute top-0 left-0 right-0 h-1.5 bg-blue-600"></div>
                         
                         <div class="space-y-2">
-                            <div class="flex justify-between items-center text-gray-400 text-xs font-bold uppercase tracking-wider mb-1">
+                            <div class="flex justify-between items-center text-blue-700 text-xs font-bold uppercase tracking-wider mb-1">
                                 <span id="label-rekap-bulan">Saldo Dompet Bulan...</span>
-                                <i class="fas fa-wallet text-gray-400 text-sm"></i>
+                                <i class="fas fa-wallet text-blue-500 text-sm cursor-pointer hover:text-blue-600 transition" onclick="window.bukaModalArsip()"></i>
                             </div>
                             
                             <div class="flex justify-between items-end">
@@ -353,6 +353,40 @@
             </div>
 
         </main>
+
+        <div id="modal-arsip-dompet" class="fixed inset-0 bg-gray-900 bg-opacity-70 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transform transition-all duration-300">
+                <div class="bg-gradient-to-r from-blue-700 to-indigo-800 px-5 py-4 flex justify-between items-center text-white">
+                    <div class="flex items-center gap-3">
+                        <i class="fas fa-archive text-xl text-blue-200"></i>
+                        <h3 class="font-bold text-lg tracking-wide">Arsip Saldo Bulanan</h3>
+                    </div>
+                    <button onclick="window.tutupModalArsip()" class="text-white hover:text-gray-200 focus:outline-none text-xl p-1">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="p-5 max-h-[70vh] overflow-y-auto bg-gray-50">
+                    <div class="bg-blue-50 border-l-4 border-blue-600 p-3 rounded mb-4 text-xs text-blue-800 flex gap-2 items-start">
+                        <i class="fas fa-info-circle mt-0.5"></i>
+                        <p>Klik salah satu baris bulan di bawah untuk memuat ulang rincian detail slip masuk pada periode tersebut.</p>
+                    </div>
+
+                    <div id="kontainer-list-arsip" class="space-y-3">
+                        <div class="text-center py-8 text-gray-500 text-sm">
+                            <i class="fas fa-circle-notch fa-spin text-blue-600 text-2xl mb-2"></i>
+                            <p>Membaca seluruh arsip finansial...</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-100 px-5 py-3 flex justify-end border-t border-gray-200">
+                    <button onclick="window.tutupModalArsip()" class="px-4 py-2 bg-gray-600 text-white font-medium rounded-xl text-sm hover:bg-gray-700 transition">
+                        Tutup Arsip
+                    </button>
+                </div>
+            </div>
+        </div>
 
         <div id="modal-detail-pemasukan" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center hidden p-4">
             <div class="bg-white rounded-2xl max-w-md w-full p-5 shadow-xl flex flex-col max-h-[85vh]">
@@ -2053,11 +2087,11 @@
 
                 // Target 4: Total Pemasukan Bulanan (id="txt-pemasukan")
                 const elPemasukan = document.getElementById('txt-pemasukan');
-                if (elPemasukan) elPemasukan.innerText = `+Rp ${totalPemasukan.toLocaleString('id-ID')}`;
+                if (elPemasukan) elPemasukan.innerText = `Rp ${totalPemasukan.toLocaleString('id-ID')}`;
 
                 // Target 5: Total Pengeluaran Bulanan (id="txt-pengeluaran")
                 const elPengeluaran = document.getElementById('txt-pengeluaran');
-                if (elPengeluaran) elPengeluaran.innerText = `-Rp ${totalPengeluaran.toLocaleString('id-ID')}`;
+                if (elPengeluaran) elPengeluaran.innerText = `Rp ${totalPengeluaran.toLocaleString('id-ID')}`;
 
                 // =================================================================
                 // FIX CRITICAL: SEMBUNYIKAN OVERLAY PENGUNCI DATA
@@ -2074,6 +2108,124 @@
 
             } catch (error) {
                 console.error("❌ Terjadi kesalahan kalkulasi dashboard saldo:", error);
+            }
+        };
+
+        // =================================================================
+        // FUNGSIONALITAS: PENGELOLA MODAL ARSIP SALDO BULANAN GLOBAL
+        // =================================================================
+
+        // 1. BUKA MODAL & FETCH DATA ARSIP
+        window.bukaModalArsip = async function() {
+            const modal = document.getElementById('modal-arsip-dompet');
+            const kontainer = document.getElementById('kontainer-list-arsip');
+            
+            if (modal) modal.classList.remove('hidden');
+            if (!kontainer) return;
+
+            // Tampilkan loader awal
+            kontainer.innerHTML = `
+                <div class="text-center py-8 text-gray-500 text-sm">
+                    <i class="fas fa-circle-notch fa-spin text-blue-600 text-2xl mb-2"></i>
+                    <p>Menghubungkan ke server finansial...</p>
+                </div>`;
+
+            try {
+                if (!window.auth || !window.auth.currentUser) return;
+                const userToken = await window.auth.currentUser.getIdToken();
+                const projectId = window.firebaseConfig?.projectId || "dompetq-app";
+
+                // Ambil seluruh isi dokumen dari collection rekap_finansial
+                const endpointUrl = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial`;
+                const respon = await fetch(endpointUrl, {
+                    method: 'GET',
+                    headers: { 'Authorization': `Bearer ${userToken}` }
+                });
+
+                if (!respon.ok) throw new Error("Gagal mengambil daftar dokumen.");
+
+                const dataJson = await respon.json();
+                const infoDokumen = dataJson.documents || [];
+
+                // Filter hanya dokumen yang merupakan snapshot saldo_lalu_
+                const daftarSaldoLalu = infoDokumen.filter(doc => {
+                    const namaDokumen = doc.name.split('/').pop();
+                    return namaDokumen.startsWith('saldo_lalu_');
+                });
+
+                if (daftarSaldoLalu.length === 0) {
+                    kontainer.innerHTML = `
+                        <div class="text-center py-8 text-gray-400 text-sm">
+                            <i class="fas fa-folder-open text-3xl mb-2 text-gray-300"></i>
+                            <p>Belum ada arsip saldo bulan lalu tercatat.</p>
+                        </div>`;
+                    return;
+                }
+
+                // Susun HTML untuk setiap arsip bulan yang ditemukan
+                let HTMLDaftarArsip = '';
+                
+                daftarSaldoLalu.forEach(doc => {
+                    const docId = doc.name.split('/').pop(); // Contoh: "saldo_lalu_juni_2026"
+                    const fields = doc.fields || {};
+                    const nominal = parseInt(fields.totalBersihNetto?.integerValue || fields.totalBersihNetto?.stringValue || 0);
+                    
+                    // Ekstrak nama bulan untuk tampilan UI yang rapi
+                    // "saldo_lalu_juni_2026" -> "juni_2026" -> ["juni", "2026"]
+                    const rawPeriode = docId.replace('saldo_lalu_', '');
+                    const partPeriode = rawPeriode.split('_');
+                    const namaBulanTampil = partPeriode[0].charAt(0).toUpperCase() + partPeriode[0].slice(1) + ' ' + (partPeriode[1] || '');
+
+                    HTMLDaftarArsip += `
+                        <div onclick="window.tampilkanDetailSlipMasaLalu('${rawPeriode}')" 
+                            class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex justify-between items-center cursor-pointer hover:border-blue-400 hover:shadow-md transition">
+                            <div class="flex items-center gap-3">
+                                <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-lg">
+                                    <i class="fas fa-calendar-check text-base"></i>
+                                </div>
+                                <div>
+                                    <h4 class="font-bold text-gray-800 text-sm">${namaBulanTampil}</h4>
+                                    <p class="text-[10px] text-gray-400">Klik untuk detail transaksi</p>
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <span class="text-xs text-gray-400 block font-medium">Saldo Sisa</span>
+                                <span class="text-sm font-bold text-emerald-600">Rp ${nominal.toLocaleString('id-ID')}</span>
+                            </div>
+                        </div>`;
+                });
+
+                kontainer.innerHTML = HTMLDaftarArsip;
+
+            } catch (error) {
+                console.error("Gagal memuat arsip dompet:", error);
+                kontainer.innerHTML = `
+                    <div class="text-center py-6 text-red-500 text-sm">
+                        <i class="fas fa-exclamation-triangle text-2xl mb-1"></i>
+                        <p>Gagal memuat arsip. Periksa koneksi internet Anda.</p>
+                    </div>`;
+            }
+        };
+
+        // 2. TUTUP MODAL ARSIP
+        window.tutupModalArsip = function() {
+            const modal = document.getElementById('modal-arsip-dompet');
+            if (modal) modal.classList.add('hidden');
+        };
+
+        // 3. JEMBATAN INTERAKTIF: MEMBUKA DETAIL SLIP BULAN PILIHAN
+        window.tampilkanDetailSlipMasaLalu = function(formatPeriodeClean) {
+            console.log(`Mengalihkan detail slip ke periode pilihan: ${formatPeriodeClean}`);
+            
+            // Tutup modal arsip terlebih dahulu agar tidak menumpuk
+            window.tutupModalArsip();
+
+            // Jalankan fungsi modal detail bawaan aplikasi Anda yang sudah ada sebelumnya
+            // (Fungsi ini akan otomatis membaca kategori sesuai format bulan yang diklik)
+            if (typeof window.bukaModalDetailSlip === 'function') {
+                window.bukaModalDetailSlip(formatPeriodeClean);
+            } else {
+                alert(`Membuka rincian slip untuk periode ${formatPeriodeClean}`);
             }
         };
 
