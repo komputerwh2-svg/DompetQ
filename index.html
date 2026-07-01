@@ -587,6 +587,17 @@
                         </div>
                         <i class="fas fa-chevron-right text-gray-300 group-hover:text-red-500 text-xs transition"></i>
                     </button>
+
+                    <button onclick="window.pilihTransaksiMutasi()" class="w-full flex items-center gap-4 bg-white p-3.5 rounded-xl border border-gray-200 hover:border-purple-500 hover:bg-purple-50/30 transition text-left shadow-xs group">
+                        <div class="w-10 h-10 rounded-lg bg-purple-100 flex items-center justify-center text-purple-600 font-bold text-lg shrink-0 group-hover:scale-105 transition">
+                            <i class="fas fa-exchange-alt"></i>
+                        </div>
+                        <div class="flex-1">
+                            <h4 class="font-bold text-xs text-gray-800">Transfer / Mutasi Saldo</h4>
+                            <p class="text-[10px] text-gray-400 mt-0.5">Pindahkan dompet utama ke pos Target Tabungan / Servis</p>
+                        </div>
+                        <i class="fas fa-chevron-right text-gray-300 group-hover:text-purple-500 text-xs transition"></i>
+                    </button>
                 </div>
             </div>
         </div>
@@ -642,6 +653,64 @@
                     </button>
                     <button onclick="window.simpanPengeluaranManual()" class="px-5 py-1.5 bg-red-600 text-white font-bold rounded-xl text-xs hover:bg-red-700 transition shadow-sm flex items-center gap-1.5">
                         <i class="fas fa-save"></i> Simpan Pengeluaran
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <div id="modal-mutasi-saldo" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center md:items-center hidden p-4 overflow-y-auto">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transform transition-all duration-300 flex flex-col my-auto">
+                <div class="bg-gradient-to-r from-purple-700 to-purple-800 px-5 py-3.5 flex justify-between items-center text-white shrink-0">
+                    <div>
+                        <h3 class="font-bold text-base tracking-wide">Mutasi / Alokasi Saldo</h3>
+                        <p class="text-[10px] text-purple-200">Pindahkan saldo utama ke sub-pos keuangan</p>
+                    </div>
+                    <button onclick="window.tutupModalMutasi()" class="text-purple-200 hover:text-white text-xl p-1">
+                        <i class="fas fa-times"></i>
+                    </button>
+                </div>
+
+                <div class="p-5 bg-slate-50 space-y-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <div class="space-y-1.5">
+                            <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Dari Dompet:</label>
+                            <input type="text" value="Saldo Utama" disabled class="w-full px-2.5 py-2 bg-gray-100 border border-gray-200 rounded-xl text-xs font-bold text-gray-500 outline-none shadow-inner cursor-not-allowed">
+                        </div>
+                        <div class="space-y-1.5">
+                            <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Ke Target Pos:</label>
+                            <select id="mutasi-tujuan" class="w-full px-2.5 py-2 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer shadow-sm">
+                                <option value="tabungan">Kantong Tabungan</option>
+                                <option value="servis">Dana Servis Kendaraan</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-3 gap-3">
+                        <div class="col-span-1 space-y-1.5">
+                            <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Periode Buku:</label>
+                            <input type="month" id="mutasi-periode" class="w-full px-2.5 py-2 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-purple-500 cursor-pointer shadow-sm">
+                        </div>
+                        <div class="col-span-2 space-y-1.5">
+                            <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider">Keterangan / Memo:</label>
+                            <input type="text" id="mutasi-keterangan" placeholder="Contoh: Tabungan bulanan, Sisihan servis" class="w-full px-3 py-2 bg-white border border-gray-300 rounded-xl text-xs font-semibold text-gray-700 outline-none focus:ring-2 focus:ring-purple-500 shadow-sm">
+                        </div>
+                    </div>
+
+                    <div class="space-y-1.5">
+                        <label class="block text-[11px] font-bold text-gray-400 uppercase tracking-wider text-purple-600">Nominal yang Ditransfer (Rp):</label>
+                        <div class="relative flex items-center">
+                            <span class="absolute left-3.5 text-xs font-bold text-gray-400">Rp</span>
+                            <input type="number" id="mutasi-nominal" placeholder="0" class="w-full pl-9 pr-4 py-2.5 bg-white border border-purple-300 rounded-xl text-sm font-black text-purple-700 outline-none focus:ring-2 focus:ring-purple-500 shadow-sm">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-gray-100 px-5 py-3 flex justify-between items-center border-t border-gray-200 shrink-0">
+                    <button onclick="window.tutupModalMutasi()" class="px-4 py-1.5 bg-gray-300 text-gray-700 font-medium rounded-xl text-xs hover:bg-gray-400 transition shadow-sm">
+                        Batal
+                    </button>
+                    <button onclick="window.simpanMutasiSaldo()" class="px-5 py-1.5 bg-purple-600 text-white font-bold rounded-xl text-xs hover:bg-purple-700 transition shadow-sm flex items-center gap-1.5">
+                        <i class="fas fa-paper-plane"></i> Proses Mutasi
                     </button>
                 </div>
             </div>
@@ -1805,6 +1874,126 @@
             } catch (error) {
                 console.error("Error Simpan Pengeluaran:", error);
                 tampilAlert(`Gagal Sinkronisasi: ${error.message}`, "error");
+            }
+        };
+
+        // --- KONTROL ROUTING UNTUK MODAL MUTASI ---
+        window.pilihTransaksiMutasi = function() {
+            window.tutupPilihanTransaksi();
+            
+            // Set default bulan berjalan di input mutasi
+            const skrg = new Date();
+            const formatBulan = `${skrg.getFullYear()}-${String(skrg.getMonth() + 1).padStart(2, '0')}`;
+            const targetPeriodeMutasi = document.getElementById('mutasi-periode');
+            if (targetPeriodeMutasi) targetPeriodeMutasi.value = formatBulan;
+
+            const modalMutasi = document.getElementById('modal-mutasi-saldo');
+            if (modalMutasi) modalMutasi.classList.remove('hidden');
+        };
+
+        window.tutupModalMutasi = function() {
+            const modalMutasi = document.getElementById('modal-mutasi-saldo');
+            if (modalMutasi) {
+                modalMutasi.classList.add('hidden');
+                document.getElementById('mutasi-keterangan').value = "";
+                document.getElementById('mutasi-nominal').value = "";
+            }
+        };
+
+        // --- FUNGSIONALITAS PROSES SIMPAN MUTASI ---
+        window.simpanMutasiSaldo = async function() {
+            const tujuan = document.getElementById('mutasi-tujuan').value;
+            const keterangan = document.getElementById('mutasi-keterangan').value.trim();
+            const nominal = parseInt(document.getElementById('mutasi-nominal').value) || 0;
+            const inputPeriode = document.getElementById('mutasi-periode').value;
+
+            if (nominal <= 0 || !keterangan) {
+                tampilAlert("Gagal memproses! Harap isi keterangan dan nominal alokasi dengan benar.", "warning");
+                return;
+            }
+
+            if (!window.auth || !window.auth.currentUser) {
+                tampilAlert("Sesi login kedaluwarsa. Silakan login ulang.", "error");
+                return;
+            }
+
+            const userAktif = window.auth.currentUser;
+            let namaUserSistem = "user_dompetq";
+            if (userAktif.email && userAktif.email.includes("@")) {
+                namaUserSistem = userAktif.email.split('@')[0];
+            }
+
+            // Parsing Periode Kalender
+            let periodeTeks = "Juni 2026";
+            let formatPeriodeClean = "juni_2026";
+            if (inputPeriode) {
+                const [tahun, bulan] = inputPeriode.split('-');
+                const namaBulanIndo = [
+                    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+                ];
+                const indexBulan = parseInt(bulan, 10) - 1;
+                if (indexBulan >= 0 && indexBulan <= 11) {
+                    periodeTeks = `${namaBulanIndo[indexBulan]} ${tahun}`;
+                    formatPeriodeClean = `${namaBulanIndo[indexBulan].toLowerCase()}_${tahun}`;
+                }
+            }
+
+            try {
+                tampilAlert("Mendaftarkan mutasi ke server...", "info");
+                const userToken = await userAktif.getIdToken(true);
+
+                // Kunci ID Unik di Firestore: mutasi_tujuan_periode (Contoh: mutasi_tabungan_juli_2026)
+                const keyTransaksi = `mutasi_${tujuan}_${formatPeriodeClean}`;
+                const projectId = window.firebaseConfig?.projectId || "dompetq-app";
+
+                const endpointFirestore = `https://firestore.googleapis.com/v1/projects/${projectId}/databases/(default)/documents/rekap_finansial/${keyTransaksi}`;
+
+                // STRUKTUR DATA MUTASI:
+                // Nominal masuk ke kolom 'potongan' karena mengurangi saldo utama,
+                // namun diberi penanda kustom referenceKeyImage: "MUTASI_TABUNGAN" / "MUTASI_SERVIS"
+                // agar logika dashboard tabungan/servis Anda nanti bisa menghitungnya sebagai pemasukan pos mereka.
+                const payloadFirestore = {
+                    fields: {
+                        kategori: { stringValue: `mutasi_${tujuan}` },
+                        keterangan: { stringValue: keterangan },
+                        periode: { stringValue: periodeTeks },
+                        pendapatan: { integerValue: "0" }, 
+                        potongan: { integerValue: nominal.toString() }, // Memotong saldo utama
+                        totalBersihNetto: { integerValue: `-${nominal}` }, // Hasil akhir mengurangi saldo
+                        referenceKeyImage: { stringValue: `MUTASI_${tujuan.toUpperCase()}` }, 
+                        waktuTransaksi: { timestampValue: new Date().toISOString() },
+                        namaUser: { stringValue: namaUserSistem }
+                    }
+                };
+
+                const responFirestore = await fetch(endpointFirestore, {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${userToken}`
+                    },
+                    body: JSON.stringify(payloadFirestore)
+                });
+
+                if (!responFirestore.ok) {
+                    const errTxt = await responFirestore.text();
+                    throw new Error(`Firestore Error: ${errTxt}`);
+                }
+
+                tampilAlert(`Sukses! Saldo dialokasikan ke ${tujuan === 'tabungan' ? 'Target Tabungan' : 'Dana Servis'} sebesar Rp ${nominal.toLocaleString('id-ID')}`, "success");
+                window.tutupModalMutasi();
+
+                // Trigger kalkulasi ulang dashboard
+                if (typeof window.inisialisasiAplikasi === 'function') {
+                    await window.inisialisasiAplikasi();
+                } else if (typeof window.muatDataDashboard === 'function') {
+                    await window.muatDataDashboard();
+                }
+
+            } catch (error) {
+                console.error("Error Simpan Mutasi:", error);
+                tampilAlert(`Gagal memproses mutasi: ${error.message}`, "error");
             }
         };
 
