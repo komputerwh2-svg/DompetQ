@@ -383,44 +383,37 @@
             </div>
         </div>
 
-        <!-- ================================================================= -->
-        <!-- MODAL: RINCIAN DETAIL ARSIP TRANSAKSI MASA LALU                   -->
-        <!-- ================================================================= -->
-        <div id="modal-detail-arsip-transaksi" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center hidden p-4">
-            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transform transition-all duration-300">
-                <!-- Header -->
-                <div class="bg-gradient-to-r from-slate-800 to-slate-900 px-5 py-4 flex justify-between items-center text-white">
+        <div id="modal-detail-arsip-transaksi" class="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center md:items-center hidden p-4 overflow-y-auto">
+            <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden transform transition-all duration-300 flex flex-col max-h-[calc(100vh-7rem)] md:max-h-[85vh] my-auto">
+                
+                <div class="bg-gradient-to-r from-slate-800 to-slate-900 px-5 py-3.5 flex justify-between items-center text-white shrink-0">
                     <div>
                         <h3 class="font-bold text-base tracking-wide" id="judul-detail-arsip">Rincian Arsip Periode</h3>
                         <p class="text-[10px] text-slate-400">Histori data masuk & dokumentasi slip</p>
                     </div>
-                    <button onclick="window.tutupDetailArsip()" class="text-gray-400 hover:text-white text-xl p-1">
+                    <button onclick="window.tutupDetailArsip()" class="text-gray-400 hover:text-white text-xl p-1 transition">
                         <i class="fas fa-times"></i>
                     </button>
                 </div>
 
-                <!-- Konten Utama -->
-                <div class="p-5 max-h-[75vh] overflow-y-auto bg-slate-50">
-                    <!-- Ringkasan Pendapatan Bersih Bulan Terpilih -->
-                    <div class="bg-white p-4 rounded-xl border border-gray-200 shadow-sm mb-4 text-center">
-                        <span class="text-xs text-gray-400 font-medium uppercase tracking-wider block">Total Kantong Masuk Bersih</span>
-                        <span class="text-2xl font-black text-blue-700 block mt-1" id="total-bersih-arsip">Rp 0</span>
+                <div class="p-4 bg-slate-50 flex flex-col overflow-hidden flex-1">
+                    
+                    <div class="bg-white p-3 rounded-xl border border-gray-200 shadow-sm mb-3 text-center shrink-0">
+                        <span class="text-[11px] text-gray-400 font-medium uppercase tracking-wider block">Total Kantong Masuk Bersih</span>
+                        <span class="text-xl font-black text-blue-700 block mt-0.5" id="total-bersih-arsip">Rp 0</span>
                     </div>
 
-                    <h4 class="text-xs font-bold text-gray-500 uppercase tracking-wider mb-2">Daftar Transaksi Ditemukan</h4>
+                    <h4 class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2 shrink-0">Daftar Transaksi Ditemukan</h4>
                     
-                    <!-- Tempat List Transaksi Terbaca -->
-                    <div id="kontainer-item-arsip" class="space-y-3">
-                        <!-- Diisi via JavaScript -->
-                    </div>
+                    <div id="kontainer-item-arsip" class="space-y-2.5 overflow-y-auto pr-1 flex-1 max-h-[35vh] md:max-h-[45vh] scrollbar-thin">
+                        </div>
                 </div>
 
-                <!-- Footer -->
-                <div class="bg-gray-100 px-5 py-3 flex justify-between items-center border-t border-gray-200">
-                    <button onclick="window.kembaliKeArsipUtama()" class="text-xs font-bold text-blue-700 hover:underline">
-                        <i class="fas fa-arrow-left mr-1"></i> Kembali ke Daftar
+                <div class="bg-gray-100 px-5 py-3 flex justify-between items-center border-t border-gray-200 shrink-0">
+                    <button onclick="window.kembaliKeArsipUtama()" class="text-xs font-bold text-blue-700 hover:underline flex items-center gap-1">
+                        <i class="fas fa-arrow-left"></i> Kembali ke Daftar
                     </button>
-                    <button onclick="window.tutupDetailArsip()" class="px-4 py-1.5 bg-gray-800 text-white font-medium rounded-xl text-xs hover:bg-gray-900 transition">
+                    <button onclick="window.tutupDetailArsip()" class="px-4 py-1.5 bg-gray-800 text-white font-medium rounded-xl text-xs hover:bg-gray-900 transition shadow-sm">
                         Tutup
                     </button>
                 </div>
@@ -667,9 +660,7 @@
                         <h3 class="font-semibold text-sm tracking-wide" id="modal-pratinjau-title">Pratinjau Slip</h3>
                     </div>
                     <button onclick="tutupModalPratinjauSlip()" class="text-slate-400 hover:text-white p-1.5 rounded-lg hover:bg-slate-800 transition-colors">
-                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l18 18"></path>
-                        </svg>
+                        <i class="fas fa-times"></i>
                     </button>
                 </div>
 
@@ -1847,7 +1838,37 @@
             const pendapatan = parseInt(document.getElementById('ocr-pendapatan').value) || 0;
             const potongan = parseInt(document.getElementById('ocr-potongan').value) || 0;
             const netto = parseInt(document.getElementById('ocr-bersih').value) || 0;
-            const periode = document.getElementById('ocr-bersih').getAttribute('data-extracted-periode') || "Juni 2026";
+
+            // --- PARSING PERIODE DARI <input type="month"> SECARA DINAMIS ---
+            const inputPeriode = document.getElementById('ocr-periode');
+            let periodeTeks = "Januari 2026"; // Fallback default jika kosong
+            let formatPeriodeClean = "januari_2026";
+
+            if (inputPeriode && inputPeriode.value) {
+                // inputPeriode.value menghasilkan format "YYYY-MM" (Contoh: "2026-02")
+                const [tahun, bulan] = inputPeriode.value.split('-');
+                
+                // Array nama bulan untuk format teks Firestore
+                const namaBulanIndo = [
+                    "Januari", "Februari", "Maret", "April", "Mei", "Juni",
+                    "Juli", "Agustus", "September", "Oktober", "November", "Desember"
+                ];
+                
+                const indexBulan = parseInt(bulan, 10) - 1;
+                if (indexBulan >= 0 && indexBulan <= 11) {
+                    // Hasil: "Februari 2026"
+                    periodeTeks = `${namaBulanIndo[indexBulan]} ${tahun}`; 
+                    // Hasil: "februari_2026"
+                    formatPeriodeClean = `${namaBulanIndo[indexBulan].toLowerCase()}_${tahun}`;
+                }
+            } else {
+                // Alternatif jika input kosong, coba intip data-attribute lama
+                const backupPeriode = document.getElementById('ocr-bersih').getAttribute('data-extracted-periode');
+                if (backupPeriode) {
+                    periodeTeks = backupPeriode;
+                    formatPeriodeClean = periodeTeks.trim().toLowerCase().replace(/\s+/g, '_');
+                }
+            }
 
             if (pendapatan <= 0) {
                 tampilAlert("Gagal menyimpan! Isian nominal data tidak valid.", "warning");
@@ -1872,8 +1893,7 @@
                 // AMBIL TOKEN ASLI USER YANG SEDANG LOGIN
                 const userToken = await userAktif.getIdToken(true);
 
-                // FORMAT KEY ID UNIK: kategori_periode (Contoh: thr_juni_2026)
-                const formatPeriodeClean = periode.trim().toLowerCase().replace(/\s+/g, '_');
+                // FORMAT KEY ID UNIK: kategori_periode (Contoh: gaji_februari_2026)
                 const formatKategoriClean = jenisKategori.trim().toLowerCase();
                 const keyTransaksi = `${formatKategoriClean}_${formatPeriodeClean}`;
 
@@ -1884,7 +1904,6 @@
 
                 // --- PROSES 1: SIMPAN KE FIREBASE REALTIME DATABASE ---
                 if (typeof globalCompressedImageBase64 !== 'undefined' && globalCompressedImageBase64) {
-                    // Melampirkan token via query parameter (?auth=TOKEN) sesuai regulasi REST API RTDB
                     let endpointRtdb = `https://${rtdbHost}/${keyTransaksi}.json?auth=${userToken}`;
                     
                     try {
@@ -1915,7 +1934,7 @@
                 const payloadFirestore = {
                     fields: {
                         kategori: { stringValue: jenisKategori },
-                        periode: { stringValue: periode },
+                        periode: { stringValue: periodeTeks }, // Tersimpan rapi: "Februari 2026"
                         pendapatan: { integerValue: pendapatan.toString() },
                         potongan: { integerValue: potongan.toString() },
                         totalBersihNetto: { integerValue: netto.toString() },
@@ -1925,7 +1944,6 @@
                     }
                 };
 
-                // Melampirkan token via Authorization Header (Bearer) agar lolos dari Security Rules
                 const headersFirestore = { 
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${userToken}`
@@ -1946,25 +1964,17 @@
                 console.log(`Data rekap sukses disimpan di Firestore: rekap_finansial/${keyTransaksi}`);
 
                 // --- BERHASIL ---
-                tampilAlert(`Sukses! Rekapitulasi ${jenisKategori.toUpperCase()} berhasil dibukukan ke Firebase Cloud.`, "success");
+                tampilAlert(`Sukses! Rekapitulasi ${jenisKategori.toUpperCase()} periode ${periodeTeks} berhasil dibukukan.`, "success");
                 
-                // 1. Tutup Modal dan jalankan pembersihan form (Reset State)
                 if (typeof window.tutupModal === 'function') {
                     window.tutupModal();
                 }
 
-                // 2. ✨ ENGINE SINKRONISASI OTOMATIS: Muat ulang data saldo di Dashboard
                 console.log("[DompetQ Sync] Memicu kalkulasi ulang angka dashboard...");
-                
-                // Menyesuaikan dengan fungsi pemanggil dashboard di index.html Anda
                 if (typeof window.inisialisasiAplikasi === 'function') {
                     await window.inisialisasiAplikasi();
                 } else if (typeof window.muatDataDashboard === 'function') {
                     await window.muatDataDashboard();
-                } else {
-                    // Fallback: Jika fungsinya berjalan anonim di dalam listener, picu custom event atau panggil fungsi render ulang Anda
-                    console.log("[DompetQ Sync] Mencari rekap bulanan flat untuk kalkulasi angka Dashboard UI...");
-                    // Jika Anda memiliki fungsi penarik data spesifik, panggil di sini.
                 }
 
             } catch (error) {
@@ -2404,7 +2414,7 @@
                                     <div class="text-right font-medium text-gray-700">Rp ${pendapatan.toLocaleString('id-ID')}</div>
                                     <div>Potongan:</div>
                                     <div class="text-right font-medium text-red-600">-Rp ${potongan.toLocaleString('id-ID')}</div>
-                                    <div class="font-bold text-gray-800">Bersih (Netto):</div>
+                                    <div class="font-bold text-gray-800">Pendapatan Bersih:</div>
                                     <div class="text-right font-bold text-emerald-600">Rp ${totalNetto.toLocaleString('id-ID')}</div>
                                 </div>
                                 
